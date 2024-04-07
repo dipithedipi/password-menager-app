@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    ports:
+      - 6500:5432
+    env_file:
+      - ./.env
+    volumes:
+      - postgres:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    ports:
+      - "5050:80"
+    env_file:
+      - ./.env
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    restart: always
+
+  # https://geshan.com.np/blog/2022/01/redis-docker/
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis
+    ports:
+      - '6379:6379'
+    env_file:
+      - ./.env
+    command: redis-server --loglevel warning --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/var/lib/redis/data
+
+volumes:
+  postgres:
+  pgadmin-data:
+  redis-data:
