@@ -1,0 +1,82 @@
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+ 
+generator db {
+  provider = "go run github.com/steebchen/prisma-client-go"
+}
+ 
+model User {
+  id              String   @id @unique @default(uuid()) // Unique identifier for the user, default is a UUID
+  username        String   @unique // Unique username
+  email           String   @unique // Unique email
+  profilePhoto    String?  @default("default.png") // Optional profile photo, default is "default.png"
+  verified        Boolean? @default(false) // Verification status, default is false
+  createdAt       DateTime @default(now()) // Creation time, default is the current time
+  updatedAt       DateTime @updatedAt // Last update time, automatically set to the current time on update
+  lastLogin       DateTime? // last login time
+ 
+  // -----------------------------------------------------------
+  masterPasswordHash    String   @unique      // Hashed master password
+  salt      String   @unique      // Salt used for hashing
+  changedAt DateTime @updatedAt // Password change time, automatically set to the current time on update
+  otpSecret String // two-factor authentication secret
+
+  // -----------------------------------------------------------
+  tokens          Token[]  // Relation to the Token model
+
+  // -----------------------------------------------------------
+  events          Event[]  // Relation to the Event model
+  passwords       Password[] // Relation to the Password model
+}
+
+model Password {
+  id         Int       @id @unique @default(autoincrement()) // Unique identifier for the password, auto-incremented
+  createdAt  DateTime  @default(now()) // Creation time, default is the current time
+  updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
+  
+  website     String    // Domain name
+  username    String    // Username
+  description String?  // Description
+
+  password   String    // Hashed password
+  salt       String    // Salt used for hashing
+  changedAt  DateTime  @updatedAt // Password change time, automatically set to the current time on update
+
+  userId     String    // Foreign key to the User model
+  user       User      @relation(fields: [userId], references: [id]) // Relation to the User model
+}
+
+// This block defines a "Token" model. This model is also related to the "User" model through a relation.
+model Token {
+  id         Int       @id @unique @default(autoincrement()) // Unique identifier for the token, auto-incremented
+  createdAt  DateTime  @default(now()) // Creation time, default is the current time
+  updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
+  tokenValue String    @unique // Unique email token
+  valid      Boolean   @default(true) // Validity status, default is true
+  type       TokenType // Token type, enum value
+  ipAddress       String // last login IP address
+
+  userId     String    // Foreign key to the User model
+  user       User      @relation(fields: [userId], references: [id]) // Relation to the User model
+}
+
+model Event {
+  id         Int       @id @unique @default(autoincrement()) // Unique identifier for the event, auto-incremented
+  createdAt  DateTime  @default(now()) // Creation time, default is the current time
+  updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
+  title      String    // Event title
+  description String?  // Event description
+  location   String?   // Event location
+  time       DateTime  // Event time
+  ipAddress  String    // Event IP address
+
+  userId     String    // Foreign key to the User model
+  user       User      @relation(fields: [userId], references: [id]) // Relation to the User model
+}
+
+enum TokenType {
+  WEB // From web
+  APP // From phone
+}
