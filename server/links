@@ -1,0 +1,14 @@
+# totp
+https://medium.com/@kittipat_1413/implementing-two-factor-authentication-2fa-with-totp-in-golang-1a3fd0dd7662
+
+# argon
+https://www.alexedwards.net/blog/how-to-hash-and-verify-passwords-with-argon2-in-go
+
+# jwt 
+https://github.com/Siddheshk02/jwt-auth-api/tree/main
+
+# email verification for password reset
+https://dvignesh1496.medium.com/email-verification-and-password-reset-flow-using-golang-c8bd037101e8
+
+# RSA
+https://dev.to/elioenaiferrari/asymmetric-cryptography-with-golang-2ffd

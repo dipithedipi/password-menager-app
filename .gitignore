@@ -5,6 +5,7 @@
 
 # environment variables file
 .env
+*.pem
 
 # Binaries for programs and plugins
 *.exe

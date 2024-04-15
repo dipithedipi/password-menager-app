@@ -8,12 +8,14 @@ import (
 	"github.com/dipithedipi/password-manager/models"
 	"github.com/dipithedipi/password-manager/prisma/db"
 	"github.com/dipithedipi/password-manager/utils"
+	"github.com/dipithedipi/password-manager/cryptography"
 	"strings"
-
+	"github.com/redis/go-redis/v9"
 	"github.com/gofiber/fiber/v2"
 )
-
-var clientDb *db.PrismaClient
+var publicKeyPEM []byte
+var clientPostgresDb *db.PrismaClient
+var clientRedisDb *redis.Client
 var p = &models.ArgonParams{
 	Memory:      64 * 1024,
 	Iterations:  3,
@@ -22,8 +24,12 @@ var p = &models.ArgonParams{
 	KeyLength:   32,
 }
 
-func SetDbClient(client *db.PrismaClient) {
-	clientDb = client
+func SetPostgresDbClient(client *db.PrismaClient) {
+	clientPostgresDb = client
+}
+
+func SetRedisDbClient(client *redis.Client) {
+	clientRedisDb = client
 }
 
 func Register(c *fiber.Ctx) error {
@@ -41,7 +47,7 @@ func Register(c *fiber.Ctx) error {
 
 	ctx := context.Background()
 
-	passwordHash, _, err := auth.GenerateFromPassword(user.PasswordHash, p)
+	passwordHash, _, err := cryptography.HashPassword(user.PasswordHash, p)
 	if err != nil {
 		fmt.Printf("[!] ERROR: hashing password %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -57,12 +63,20 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	createUser, err := clientDb.User.CreateOne(
+	encryptedOtpSecret := cryptography.EncryptData([]byte(otpSecret))
+	if encryptedOtpSecret == nil {
+		fmt.Printf("[!] ERROR: encrypting otp secret: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "could not create user",
+		})
+	}
+
+	createUser, err := clientPostgresDb.User.CreateOne(
 		db.User.Username.Set(user.Username),
 		db.User.Email.Set(user.Email),
 		db.User.MasterPasswordHash.Set(passwordHash),
 		db.User.Salt.Set([]byte(user.Salt)),
-		db.User.OtpSecret.Set(otpSecret), // need to be crypted with the server public key
+		db.User.OtpSecret.Set(encryptedOtpSecret),
 	).Exec(ctx)
 
 	if err != nil {
@@ -94,6 +108,9 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
+	clientRedisDb.Set(ctx, createUser.ID, otpSecret, 0)
+	fmt.Printf("[+] OTP secret stored in redis(%v:%v)\n", createUser.ID, otpSecret)
+
 	fmt.Printf("[+] Created user: %s\n", result)
 
 	return c.SendStatus(fiber.StatusOK)
@@ -101,7 +118,7 @@ func Register(c *fiber.Ctx) error {
 
 func Salt(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
-		"salt": auth.Salt(p.SaltLength),
+		"salt": cryptography.GenerateSalt(p.SaltLength),
 	})
 }
 
