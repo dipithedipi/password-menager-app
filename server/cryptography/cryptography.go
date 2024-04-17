@@ -9,7 +9,7 @@ import (
     "crypto/x509"
     "errors"
     "crypto/cipher"
-    "io"
+    "bytes"
     "encoding/base64"
     "crypto/aes"
     "encoding/pem"
@@ -81,57 +81,60 @@ func DecryptDataRSA(ciphertext []byte, privateKeyPEM []byte) []byte {
     return plaintext
 }
 
-// CBC
-// FIX THIS FUNCTION (plaintext is not a multiple of the block size)
-func EncryptAESCBC(plaintext []byte, key []byte) ([]byte, error) {
-    fmt.Printf("len plaintext: %v\n", len(plaintext))
-    fmt.Printf("len key: %v\n", len(key))
-
-    if len(plaintext)%aes.BlockSize != 0 {
-        panic("plaintext is not a multiple of the block size")
-    }
-
+// AES CBC
+func EncryptAESCBC(plaintext string, key []byte) ([]byte, error) {
     block, err := aes.NewCipher(key)
-    if err != nil {
-        panic(err)
-    }
+	if err != nil {
+		fmt.Println("key error1", err)
+        return nil, err
+	}
 
-    ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-    iv := ciphertext[:aes.BlockSize]
-    if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-        panic(err)
-    }
+	if plaintext == "" {
+		fmt.Println("plain content empty")
+        return nil, errors.New("plain content empty")
+	}
 
-    cbc := cipher.NewCBCEncrypter(block, iv)
-    cbc.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+    initialVector := key[:aes.BlockSize]
+	ecb := cipher.NewCBCEncrypter(block, []byte(initialVector))
+	content := []byte(string(plaintext))
+	content = PKCS5Padding(content, block.BlockSize())
+	ciphertext := make([]byte, len(content))
+	ecb.CryptBlocks(ciphertext, content)
 
-    return ciphertext, nil
+	return ciphertext, nil
 }
 
 func DecryptAESCBC(ciphertext []byte, key []byte) ([]byte, error) {
-    var block cipher.Block
-
     block, err := aes.NewCipher(key)
-    if err != nil {
+	if err != nil {
         return nil, err
-    }
+	}
+	if len(ciphertext) == 0 {
+        return nil, errors.New("plain content empty")
+	}
 
-    if len(ciphertext) < aes.BlockSize {
-        fmt.Printf("ciphertext too short")
-        return nil, errors.New("ciphertext too short")
-    }
+    initialVector := key[:aes.BlockSize]
+	ecb := cipher.NewCBCDecrypter(block, []byte(initialVector))
+	decrypted := make([]byte, len(ciphertext))
+	ecb.CryptBlocks(decrypted, ciphertext)
 
-    iv := ciphertext[:aes.BlockSize]
-    plaintext := ciphertext[aes.BlockSize:]
-
-    cbc := cipher.NewCBCDecrypter(block, iv)
-    cbc.CryptBlocks(plaintext, plaintext)
-
-    return plaintext, nil
+	return PKCS5Trimming(decrypted), nil
 }
 
+func PKCS5Padding(ciphertext []byte, blockSize int) []byte {
+	padding := blockSize - len(ciphertext)%blockSize
+	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
+	return append(ciphertext, padtext...)
+}
+
+func PKCS5Trimming(encrypt []byte) []byte {
+	padding := encrypt[len(encrypt)-1]
+	return encrypt[:len(encrypt)-int(padding)]
+}
+
+// Base64
 func Base64Encode(data []byte) string {
-    return base64.StdEncoding.EncodeToString(data[aes.BlockSize:])
+    return base64.StdEncoding.EncodeToString(data)
 }
 
 func Base64Decode(data string) []byte {

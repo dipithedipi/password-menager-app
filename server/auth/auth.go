@@ -3,11 +3,15 @@ package auth
 import (
 	"fmt"
 	"time"
+	"os"
+	"strconv"
 	"github.com/xlzd/gotp"
 )
 
 
-func GenerateTOTPSecret(secretLenght int) string {
+func GenerateTOTPSecret() string {
+	secretLenght, err := strconv.Atoi(os.Getenv("OTP_SECRET_LENGTH"))
+	if err != nil {panic(err)}
 	return gotp.RandomSecret(secretLenght)
 }
 

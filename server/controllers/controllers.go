@@ -16,7 +16,7 @@ import (
 )
 
 var clientPostgresDb *db.PrismaClient
-var clientRedisDb *redis.Client
+var clientRedisDb *redis.Client 
 var p = &models.ArgonParams{
 	Memory:      64 * 1024,
 	Iterations:  3,
@@ -24,6 +24,7 @@ var p = &models.ArgonParams{
 	SaltLength:  16,
 	KeyLength:   32,
 }
+
 
 func SetPostgresDbClient(client *db.PrismaClient) {
 	clientPostgresDb = client
@@ -62,7 +63,7 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	otpSecret := auth.GenerateTOTPSecret(int(p.SaltLength))
+	otpSecret := auth.GenerateTOTPSecret()
 	fmt.Printf("[+] OTP secret: %v\n", otpSecret)
 	if otpSecret == "" {
 		fmt.Printf("[!] ERROR: generating random secret for otp: %v", err)
@@ -122,9 +123,7 @@ func Register(c *fiber.Ctx) error {
 	fmt.Printf("[+] Created user: %s\n", result)
 
 	otpSecretUri := auth.GenerateUriTOTPWithSecret(otpSecret, user.Email)
-	paddedLength := (int(len(otpSecretUri)/16)+1)*16
-	otpSecretUriPadded := utils.Padding(otpSecretUri, paddedLength)
-	encryptedBytesOtpSecret, err := cryptography.EncryptAESCBC([]byte(otpSecretUriPadded), []byte(passwordHash))
+	encryptedBytesOtpSecret, err := cryptography.EncryptAESCBC(otpSecretUri, []byte(passwordHash))
 	if err != nil {
 		fmt.Printf("[!] ERROR: encrypting otp secret to send back: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -133,15 +132,14 @@ func Register(c *fiber.Ctx) error {
 	}
 	encryptedOtpSecret := cryptography.Base64Encode(encryptedBytesOtpSecret)
 
-	a := cryptography.Base64Decode(encryptedOtpSecret)
-	b := utils.UnPadding(string(a[:]), paddedLength)
-	z, err := cryptography.DecryptAESCBC([]byte(b), []byte(passwordHash)) 
+	// a := cryptography.Base64Decode(encryptedOtpSecret)
+	// z, _ := cryptography.DecryptAESCBC(a, []byte(passwordHash)) 	
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "User created successfully",
-		"otpSecret": encryptedOtpSecret,
-		"a": z,
-		"padding": paddedLength - len(otpSecretUri),
+		"otpSecretUri": encryptedOtpSecret,
+		//"otpSecretUri": otpSecretUri,
+		//"otpSecretUriDecrypted": string(z),
 	})
 }
 
