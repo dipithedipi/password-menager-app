@@ -7,12 +7,18 @@ import (
     "crypto/rand"
     "crypto/rsa"
     "crypto/x509"
+    "errors"
+    "crypto/cipher"
+    "io"
+    "encoding/base64"
+    "crypto/aes"
     "encoding/pem"
     "os"
 	"fmt"
 )
 
-func GenerateKeys(publicKeyPath string, privateKeyPath string, keyLenght int) {
+// RSA
+func GenerateKeysRSA(publicKeyPath string, privateKeyPath string, keyLenght int) {
     privateKey, err := rsa.GenerateKey(rand.Reader, keyLenght)
     if err != nil {
         panic(err)
@@ -44,7 +50,7 @@ func GenerateKeys(publicKeyPath string, privateKeyPath string, keyLenght int) {
     }
 }
 
-func EncryptData(plaintext []byte) []byte {
+func EncryptDataRSA(plaintext []byte) []byte {
     publicKeyPEM := keys.ReadPublicKeyPEM()
 	publicKeyBlock, _ := pem.Decode(publicKeyPEM)
 	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
@@ -60,7 +66,7 @@ func EncryptData(plaintext []byte) []byte {
 	return ciphertext
 }
 
-func DecryptData(ciphertext []byte, privateKeyPEM []byte) []byte {
+func DecryptDataRSA(ciphertext []byte, privateKeyPEM []byte) []byte {
     privateKeyBlock, _ := pem.Decode(privateKeyPEM)
     privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
     if err != nil {
@@ -73,6 +79,68 @@ func DecryptData(ciphertext []byte, privateKeyPEM []byte) []byte {
     }
 
     return plaintext
+}
+
+// CBC
+// FIX THIS FUNCTION (plaintext is not a multiple of the block size)
+func EncryptAESCBC(plaintext []byte, key []byte) ([]byte, error) {
+    fmt.Printf("len plaintext: %v\n", len(plaintext))
+    fmt.Printf("len key: %v\n", len(key))
+
+    if len(plaintext)%aes.BlockSize != 0 {
+        panic("plaintext is not a multiple of the block size")
+    }
+
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        panic(err)
+    }
+
+    ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+    iv := ciphertext[:aes.BlockSize]
+    if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+        panic(err)
+    }
+
+    cbc := cipher.NewCBCEncrypter(block, iv)
+    cbc.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+
+    return ciphertext, nil
+}
+
+func DecryptAESCBC(ciphertext []byte, key []byte) ([]byte, error) {
+    var block cipher.Block
+
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return nil, err
+    }
+
+    if len(ciphertext) < aes.BlockSize {
+        fmt.Printf("ciphertext too short")
+        return nil, errors.New("ciphertext too short")
+    }
+
+    iv := ciphertext[:aes.BlockSize]
+    plaintext := ciphertext[aes.BlockSize:]
+
+    cbc := cipher.NewCBCDecrypter(block, iv)
+    cbc.CryptBlocks(plaintext, plaintext)
+
+    return plaintext, nil
+}
+
+func Base64Encode(data []byte) string {
+    return base64.StdEncoding.EncodeToString(data[aes.BlockSize:])
+}
+
+func Base64Decode(data string) []byte {
+    decoded, err := base64.StdEncoding.DecodeString(data)
+    if err != nil {
+        panic(err)
+    }
+
+    return decoded
 }
 
 func HashPassword(password string, p *models.ArgonParams) (hash []byte, salt []byte, err error) {

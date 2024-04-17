@@ -22,7 +22,7 @@ func main() {
     // Generate encryption keys if they don't exist
     if _, err := os.Stat(os.Getenv("PUBLIC_KEY_PATH")); os.IsNotExist(err) {
         fmt.Println("[!] Generating crypto keys")
-        cryptography.GenerateKeys(os.Getenv("PUBLIC_KEY_PATH"), os.Getenv("PRIVATE_KEY_PATH"), 2048)
+        cryptography.GenerateKeysRSA(os.Getenv("PUBLIC_KEY_PATH"), os.Getenv("PRIVATE_KEY_PATH"), 2048)
         fmt.Print("[+] Keys generated and saved\n")
     } else {
         fmt.Println("[+] Crypto keys already exist")

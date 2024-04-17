@@ -3,7 +3,27 @@ package utils
 import (
 	"fmt"
 	"reflect"
+	"net/mail"
 )
+
+func ValidateEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+    return err == nil
+}
+
+func Padding(s string, length int) string {
+	for len(s) < length {
+		s = s + "="
+	}
+	return s
+}
+
+func UnPadding(s string, length int) string {
+	for len(s) > length {
+		s = s[:len(s)-1]
+	}
+	return s
+}
 
 func CheckAllFieldsHaveValue(s interface{}) bool {
 	val := reflect.ValueOf(s)

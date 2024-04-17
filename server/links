@@ -12,3 +12,13 @@ https://dvignesh1496.medium.com/email-verification-and-password-reset-flow-using
 
 # RSA
 https://dev.to/elioenaiferrari/asymmetric-cryptography-with-golang-2ffd
+
+# AES
+https://gist.github.com/locked/b066aa1ddeb2b28e855e
+
+# REDIS
+https://medium.com/@cheickzida/using-redis-in-golang-applications-efe318cc846e
+
+# PRISMA
+go run github.com/steebchen/prisma-client-go db push
+https://goprisma.org/docs/getting-started/quickstart

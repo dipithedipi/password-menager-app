@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/dipithedipi/password-manager/auth"
+	"github.com/dipithedipi/password-manager/cryptography"
 	"github.com/dipithedipi/password-manager/models"
 	"github.com/dipithedipi/password-manager/prisma/db"
 	"github.com/dipithedipi/password-manager/utils"
-	"github.com/dipithedipi/password-manager/cryptography"
-	"strings"
-	"github.com/redis/go-redis/v9"
 	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
 )
-var publicKeyPEM []byte
+
 var clientPostgresDb *db.PrismaClient
 var clientRedisDb *redis.Client
 var p = &models.ArgonParams{
@@ -45,6 +46,12 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
+	if !utils.ValidateEmail(user.Email) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "invalid email",
+		})
+	}
+
 	ctx := context.Background()
 
 	passwordHash, _, err := cryptography.HashPassword(user.PasswordHash, p)
@@ -56,6 +63,7 @@ func Register(c *fiber.Ctx) error {
 	}
 
 	otpSecret := auth.GenerateTOTPSecret(int(p.SaltLength))
+	fmt.Printf("[+] OTP secret: %v\n", otpSecret)
 	if otpSecret == "" {
 		fmt.Printf("[!] ERROR: generating random secret for otp: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -63,9 +71,9 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	encryptedOtpSecret := cryptography.EncryptData([]byte(otpSecret))
-	if encryptedOtpSecret == nil {
-		fmt.Printf("[!] ERROR: encrypting otp secret: %v", err)
+	encryptedStoredOtpSecret := cryptography.EncryptDataRSA([]byte(otpSecret))
+	if encryptedStoredOtpSecret == nil {
+		fmt.Printf("[!] ERROR: encrypting otp secret to store: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "could not create user",
 		})
@@ -76,7 +84,7 @@ func Register(c *fiber.Ctx) error {
 		db.User.Email.Set(user.Email),
 		db.User.MasterPasswordHash.Set(passwordHash),
 		db.User.Salt.Set([]byte(user.Salt)),
-		db.User.OtpSecret.Set(encryptedOtpSecret),
+		db.User.OtpSecret.Set(encryptedStoredOtpSecret),
 	).Exec(ctx)
 
 	if err != nil {
@@ -113,7 +121,28 @@ func Register(c *fiber.Ctx) error {
 
 	fmt.Printf("[+] Created user: %s\n", result)
 
-	return c.SendStatus(fiber.StatusOK)
+	otpSecretUri := auth.GenerateUriTOTPWithSecret(otpSecret, user.Email)
+	paddedLength := (int(len(otpSecretUri)/16)+1)*16
+	otpSecretUriPadded := utils.Padding(otpSecretUri, paddedLength)
+	encryptedBytesOtpSecret, err := cryptography.EncryptAESCBC([]byte(otpSecretUriPadded), []byte(passwordHash))
+	if err != nil {
+		fmt.Printf("[!] ERROR: encrypting otp secret to send back: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "could not create user",
+		})
+	}
+	encryptedOtpSecret := cryptography.Base64Encode(encryptedBytesOtpSecret)
+
+	a := cryptography.Base64Decode(encryptedOtpSecret)
+	b := utils.UnPadding(string(a[:]), paddedLength)
+	z, err := cryptography.DecryptAESCBC([]byte(b), []byte(passwordHash)) 
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "User created successfully",
+		"otpSecret": encryptedOtpSecret,
+		"a": z,
+		"padding": paddedLength - len(otpSecretUri),
+	})
 }
 
 func Salt(c *fiber.Ctx) error {
