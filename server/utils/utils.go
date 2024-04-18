@@ -2,8 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"reflect"
 	"net/mail"
+	"reflect"
+	"strconv"
+	"time"
 )
 
 func ValidateEmail(email string) bool {
@@ -38,4 +40,24 @@ func CheckAllFieldsHaveValue(s interface{}) bool {
 	}
 
 	return true
+}
+
+func CalculateExpireTimeInt64(minutes string) int64 {
+	i, err := strconv.Atoi(minutes)
+	if err != nil {
+		fmt.Println("[!] Error converting string to int")
+		panic(err)
+	}
+
+	return time.Now().Add(time.Minute * time.Duration(i)).Unix()
+}
+
+func CalculateExpireTime(minutes string) time.Time {
+	i, err := strconv.Atoi(minutes)
+	if err != nil {
+		fmt.Println("[!] Error converting string to int")
+		panic(err)
+	}
+
+	return time.Now().Add(time.Minute * time.Duration(i))
 }

@@ -8,8 +8,10 @@ import (
     "crypto/rsa"
     "crypto/x509"
     "errors"
+    "strings"
     "crypto/cipher"
     "bytes"
+    "crypto/subtle"
     "encoding/base64"
     "crypto/aes"
     "encoding/pem"
@@ -81,7 +83,7 @@ func DecryptDataRSA(ciphertext []byte, privateKeyPEM []byte) []byte {
     return plaintext
 }
 
-// AES CBC
+// AES CBC (not working)
 func EncryptAESCBC(plaintext string, key []byte) ([]byte, error) {
     block, err := aes.NewCipher(key)
 	if err != nil {
@@ -132,6 +134,63 @@ func PKCS5Trimming(encrypt []byte) []byte {
 	return encrypt[:len(encrypt)-int(padding)]
 }
 
+// AES GCM
+func EncryptAESGCM(plaintext string, secretKey []byte) ([]byte, error)  {
+    fmt.Println("plaintext lenght: %v", len(plaintext))
+    fmt.Println("plaintext: %v", plaintext)
+    fmt.Println("key lenght: %v", len(secretKey))
+    fmt.Println("key: %v", secretKey)
+
+    aes, err := aes.NewCipher(secretKey)
+    if err != nil {
+        return nil, err
+    }
+
+    gcm, err := cipher.NewGCM(aes)
+    if err != nil {
+        return nil, err
+    }
+
+    // We need a 12-byte nonce for GCM (modifiable if you use cipher.NewGCMWithNonceSize())
+    // A nonce should always be randomly generated for every encryption.
+    nonce := make([]byte, gcm.NonceSize())
+    _, err = rand.Read(nonce)
+    if err != nil {
+        return nil, err
+    }
+
+    // ciphertext here is actually nonce+ciphertext
+    // So that when we decrypt, just knowing the nonce size
+    // is enough to separate it from the ciphertext.
+    ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+
+    return ciphertext, nil
+}
+
+func DecryptAESGCM(ciphertext string, secretKey []byte) ([]byte, error) {
+    aes, err := aes.NewCipher(secretKey)
+    if err != nil {
+        return nil, err
+    }
+
+    gcm, err := cipher.NewGCM(aes)
+    if err != nil {
+        return nil, err
+    }
+
+    // Since we know the ciphertext is actually nonce+ciphertext
+    // And len(nonce) == NonceSize(). We can separate the two.
+    nonceSize := gcm.NonceSize()
+    nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+
+    plaintext, err := gcm.Open(nil, []byte(nonce), []byte(ciphertext), nil)
+    if err != nil {
+        return nil, err
+    }
+
+    return plaintext, nil
+}
+
 // Base64
 func Base64Encode(data []byte) string {
     return base64.StdEncoding.EncodeToString(data)
@@ -146,21 +205,83 @@ func Base64Decode(data string) []byte {
     return decoded
 }
 
-func HashPassword(password string, p *models.ArgonParams) (hash []byte, salt []byte, err error) {
-	// Generate a cryptographically secure random salt.
-	salt, err = generateRandomBytes(p.SaltLength)
-	if err != nil {
-		return nil, nil, err
-	}
+// Argon2
+func HashPassword(password string, p *models.ArgonParams) (encodedHash string, err error) {
+    salt, err := generateRandomBytes(p.SaltLength)
+    if err != nil {
+        return "", err
+    }
 
-	// Pass the plaintext password, salt and parameters to the argon2.IDKey
-	// function. This will generate a hash of the password using the Argon2id
-	// variant.
-	hash = argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
+    hash := argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
 
-	return hash, salt, nil
+    // Base64 encode the salt and hashed password.
+    b64Salt := base64.RawStdEncoding.EncodeToString(salt)
+    b64Hash := base64.RawStdEncoding.EncodeToString(hash)
+
+    // Return a string using the standard encoded hash representation.
+    encodedHash = fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, p.Memory, p.Iterations, p.Parallelism, b64Salt, b64Hash)
+
+    return encodedHash, nil
 }
 
+func ComparePasswordAndHash(password string, encodedHash string) (match bool, err error) {
+    // Extract the parameters, salt and derived key from the encoded password
+    // hash.
+    p, salt, hash, err := DecodeHash(encodedHash)
+
+    if err != nil {
+        return false, err
+    }
+
+    // Derive the key from the other password using the same parameters.
+    otherHash := argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
+
+    // Check that the contents of the hashed passwords are identical. Note
+    // that we are using the subtle.ConstantTimeCompare() function for this
+    // to help prevent timing attacks.
+    if subtle.ConstantTimeCompare(hash, otherHash) == 1 {
+        return true, nil
+    }
+    return false, nil
+}
+
+func DecodeHash(encodedHash string) (p *models.ArgonParams, salt, hash []byte, err error) {
+    vals := strings.Split(encodedHash, "$")
+    if len(vals) != 6 {
+        return nil, nil, nil, errors.New("the encoded hash is not in the correct format")
+    }
+
+    var version int
+    _, err = fmt.Sscanf(vals[2], "v=%d", &version)
+    if err != nil {
+        return nil, nil, nil, err
+    }
+    if version != argon2.Version {
+        return nil, nil, nil, errors.New("incompatible version of argon2")
+    }
+
+    p = &models.ArgonParams{}
+    _, err = fmt.Sscanf(vals[3], "m=%d,t=%d,p=%d", &p.Memory, &p.Iterations, &p.Parallelism)
+    if err != nil {
+        return nil, nil, nil, err
+    }
+
+    salt, err = base64.RawStdEncoding.Strict().DecodeString(vals[4])
+    if err != nil {
+        return nil, nil, nil, err
+    }
+    p.SaltLength = uint32(len(salt))
+
+    hash, err = base64.RawStdEncoding.Strict().DecodeString(vals[5])
+    if err != nil {
+        return nil, nil, nil, err
+    }
+    p.KeyLength = uint32(len(hash))
+
+    return p, salt, hash, nil
+}
+
+// other
 func generateRandomBytes(n uint32) ([]byte, error) {
 	b := make([]byte, n)
 	_, err := rand.Read(b)

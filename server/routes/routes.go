@@ -8,6 +8,7 @@ import (
     "github.com/redis/go-redis/v9"
     "os"
     "context"
+    jwtware "github.com/gofiber/contrib/jwt"
 )
 
 func SetupClientPostgresDb () (*db.PrismaClient, error) {
@@ -43,9 +44,19 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     controllers.SetPostgresDbClient(clientPostgresDb)
     controllers.SetRedisDbClient(clientRedisDb)
 
-    api := app.Group("/user")
-    api.Post("/register", controllers.Register)
-    api.Get("/register/salt", controllers.Salt)
+    apiUser := app.Group("/user")
+    apiUser.Post("/register", controllers.Register)
+    apiUser.Get("/register/salt", controllers.Salt)
+    apiUser.Post("/login", controllers.Login)
+
+    app.Use(jwtware.New(jwtware.Config{
+        SigningKey: jwtware.SigningKey{Key: []byte(os.Getenv("JWT_SECRET_KEY"))},
+        TokenLookup: "cookie:" + os.Getenv("JWT_COOKIE_TOKEN_NAME"),
+    }))
+
+    apiPassword := app.Group("/password")
+    apiPassword.Get("/jwt", controllers.TestJWT)
+
     // api.Get("/get-user", controllers.User)
     // api.Post("/login", controllers.Login)
     // api.Post("/logout", controllers.Logout)

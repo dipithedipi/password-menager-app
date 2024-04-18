@@ -3,8 +3,11 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/dipithedipi/password-manager/auth"
 	"github.com/dipithedipi/password-manager/cryptography"
@@ -55,7 +58,7 @@ func Register(c *fiber.Ctx) error {
 
 	ctx := context.Background()
 
-	passwordHash, _, err := cryptography.HashPassword(user.PasswordHash, p)
+	passwordHash, err := cryptography.HashPassword(user.PasswordHash, p)
 	if err != nil {
 		fmt.Printf("[!] ERROR: hashing password %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -66,25 +69,26 @@ func Register(c *fiber.Ctx) error {
 	otpSecret := auth.GenerateTOTPSecret()
 	fmt.Printf("[+] OTP secret: %v\n", otpSecret)
 	if otpSecret == "" {
-		fmt.Printf("[!] ERROR: generating random secret for otp: %v", err)
+		fmt.Printf("[!] ERROR: generating random secret for otp")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "could not create user",
 		})
 	}
 
-	encryptedStoredOtpSecret := cryptography.EncryptDataRSA([]byte(otpSecret))
-	if encryptedStoredOtpSecret == nil {
-		fmt.Printf("[!] ERROR: encrypting otp secret to store: %v", err)
+	encryptedStoredBytesOtpSecret := cryptography.EncryptDataRSA([]byte(otpSecret))
+	if encryptedStoredBytesOtpSecret == nil {
+		fmt.Printf("[!] ERROR: encrypting otp secret to store")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "could not create user",
 		})
 	}
+	encryptedStoredOtpSecret := cryptography.Base64Encode(encryptedStoredBytesOtpSecret)
 
 	createUser, err := clientPostgresDb.User.CreateOne(
 		db.User.Username.Set(user.Username),
 		db.User.Email.Set(user.Email),
 		db.User.MasterPasswordHash.Set(passwordHash),
-		db.User.Salt.Set([]byte(user.Salt)),
+		db.User.Salt.Set(user.Salt),
 		db.User.OtpSecret.Set(encryptedStoredOtpSecret),
 	).Exec(ctx)
 
@@ -123,23 +127,25 @@ func Register(c *fiber.Ctx) error {
 	fmt.Printf("[+] Created user: %s\n", result)
 
 	otpSecretUri := auth.GenerateUriTOTPWithSecret(otpSecret, user.Email)
-	encryptedBytesOtpSecret, err := cryptography.EncryptAESCBC(otpSecretUri, []byte(passwordHash))
-	if err != nil {
-		fmt.Printf("[!] ERROR: encrypting otp secret to send back: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "could not create user",
-		})
-	}
-	encryptedOtpSecret := cryptography.Base64Encode(encryptedBytesOtpSecret)
+	fmt.Printf("password lenght: %v\n", len(passwordHash))
+	fmt.Print("password hash: ", passwordHash, "\n")
+	// encryptedBytesOtpSecret, err := cryptography.EncryptAESGCM(otpSecretUri, []byte(passwordHash))
+	// if err != nil {
+	// 	fmt.Printf("[!] ERROR: encrypting otp secret to send back: %v", err)
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"message": "could not create user",
+	// 	})
+	// }
+	// encryptedOtpSecret := cryptography.Base64Encode(encryptedBytesOtpSecret)
 
 	// a := cryptography.Base64Decode(encryptedOtpSecret)
 	// z, _ := cryptography.DecryptAESCBC(a, []byte(passwordHash)) 	
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "User created successfully",
-		"otpSecretUri": encryptedOtpSecret,
-		//"otpSecretUri": otpSecretUri,
-		//"otpSecretUriDecrypted": string(z),
+		// "otpSecretUri": encryptedOtpSecret,
+		"otpSecretUriUnencrypted": otpSecretUri,
+		// "otpSecretUriDecrypted": string(z),
 	})
 }
 
@@ -149,60 +155,113 @@ func Salt(c *fiber.Ctx) error {
 	})
 }
 
-// const SecretKey = "secret"
+func Login(c *fiber.Ctx) error {
+	var user models.UserLogin
 
-// func Login(c *fiber.Ctx) error {
-// 	var data map[string]string
+	if err := c.BodyParser(&user); err != nil {
+		return fiber.ErrBadRequest
+	}
 
-// 	if err := c.BodyParser(&data); err != nil {
-// 		return err
-// 	}
+	if !utils.CheckAllFieldsHaveValue(user) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
 
-// 	var user models.User
+	if !utils.ValidateEmail(user.Email) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "invalid email",
+		})
+	}
 
-// 	database.DB.Where("email = ?", data["email"]).First(&user) //Check the email is present in the DB
+	retrivedUserDb, err := clientPostgresDb.User.FindMany(
+		db.User.Email.Equals(user.Email),
+	).Exec(context.Background())
+	if errors.Is(err, db.ErrNotFound) {
+		fmt.Printf("[-] No record with email: %s\n", user.Email)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Email incorrect",
+		})
+	} else if err != nil {
+		fmt.Printf("[!] Error occurred finding email in database: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
 
-// 	if user.ID == 0 { //If the ID return is '0' then there is no such email present in the DB
-// 		c.Status(fiber.StatusNotFound)
-// 		return c.JSON(fiber.Map{
-// 			"message": "user not found",
-// 		})
-// 	}
+	// check if the password is correct
+	equal, err := cryptography.ComparePasswordAndHash(user.PasswordHash, retrivedUserDb[0].MasterPasswordHash)
+	if err != nil {
+		fmt.Printf("[!] Error occurred comparing password and hash: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+	
+	if !equal {
+		fmt.Printf("[-] Login: Password wrong\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Password incorrect",
+		})
+	}
 
-// 	if err := bcrypt.CompareHashAndPassword(user.Password, []byte(data["password"])); err != nil {
-// 		c.Status(fiber.StatusBadRequest)
-// 		return c.JSON(fiber.Map{
-// 			"message": "incorrect password",
-// 		})
-// 	} // If the email is present in the DB then compare the Passwords and if incorrect password then return error.
+	// Check if the user has an OTP secret
+	otpSecret := clientRedisDb.Get(context.Background(), retrivedUserDb[0].ID).Val()
+	if otpSecret == "" {
+		fmt.Printf("[-] OTP: No secret found\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "OTP error",
+		})
+	}
+	if !auth.VerifyOTP(otpSecret, user.Otp) {
+		fmt.Printf("[-] OTP: Invalid code\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Invalid OTP",
+		})
+	}
 
-// 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
-// 		Issuer:    strconv.Itoa(int(user.ID)),
-// 		ExpiresAt: time.Now().Add(time.Hour * 24).Unix(), //1 day
-// 	})
+	fmt.Printf("[+] OTP: Access granted\n")
 
-// 	token, err := claims.SignedString([]byte(SecretKey))
+	jwtToken, err := auth.GenerateJWTToken(retrivedUserDb[0].ID, os.Getenv("JWT_EXPIRES_IN"))
+	if err != nil {
+		fmt.Printf("[!] Error occurred generating JWT token: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
 
-// 	if err != nil {
-// 		c.Status(fiber.StatusInternalServerError)
-// 		return c.JSON(fiber.Map{
-// 			"message": "could not login",
-// 		})
-// 	}
+	cookie := fiber.Cookie{
+		Name:     os.Getenv("JWT_COOKIE_TOKEN_NAME"),
+		Value:    jwtToken,
+		Expires:  utils.CalculateExpireTime(os.Getenv("JWT_EXPIRES_IN")),
+		HTTPOnly: true,
+	}
 
-// 	cookie := fiber.Cookie{
-// 		Name:     "jwt",
-// 		Value:    token,
-// 		Expires:  time.Now().Add(time.Hour * 24),
-// 		HTTPOnly: true,
-// 	}
+	_, err = clientPostgresDb.User.FindMany(
+		db.User.ID.Equals(retrivedUserDb[0].ID),
+	).Update(
+		db.User.LastLogin.Set(time.Now()),
+	).Exec(context.Background())
 
-// 	c.Cookie(&cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred updating last login: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+	fmt.Printf("[+] Updated last login: \n",)
 
-// 	return c.JSON(fiber.Map{
-// 		"message": "success",
-// 	})
-// }
+	c.Cookie(&cookie)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Login successful",
+	})
+}
+
+func TestJWT(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{
+		"message": "jwt",
+	})
+}
 
 // func User(c *fiber.Ctx) error {
 // 	cookie := c.Cookies("jwt")

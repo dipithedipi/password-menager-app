@@ -18,10 +18,10 @@ model User {
   lastLogin       DateTime? // last login time
  
   // -----------------------------------------------------------
-  masterPasswordHash    Bytes   @unique      // Hashed master password
-  salt      Bytes   @unique      // Salt used for hashing
+  masterPasswordHash    String   @unique      // Hashed master password
+  salt      String   @unique      // Salt used for hashing
   changedAt DateTime @updatedAt // Password change time, automatically set to the current time on update
-  otpSecret Bytes // two-factor authentication secret
+  otpSecret String // two-factor authentication secret
 
   // -----------------------------------------------------------
   tokens          Token[]  // Relation to the Token model
@@ -56,7 +56,7 @@ model Token {
   tokenValue String    @unique // Unique email token
   valid      Boolean   @default(true) // Validity status, default is true
   type       TokenType // Token type, enum value
-  ipAddress       String // last login IP address
+  ipAddress  String // last login IP address
 
   userId     String    // Foreign key to the User model
   user       User      @relation(fields: [userId], references: [id]) // Relation to the User model
