@@ -46,6 +46,9 @@ func main() {
         fmt.Println("[+] Connected to the redis database")
     }
 
+    // Sync the redis database with otp secrets decrypted from the postgres database
+    routes.SyncRedisOTPSecret(clientPostgresDb, clientRedisDb)
+
     // Create a new Fiber app
     app := fiber.New()
     routes.Setup(app, clientPostgresDb, clientRedisDb)

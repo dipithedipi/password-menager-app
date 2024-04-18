@@ -12,3 +12,12 @@ func ReadPublicKeyPEM() []byte {
 
     return publicKeyPEM
 }
+
+func ReadPrivateKeyPEM() []byte {
+    publicKeyPEM, err := os.ReadFile(os.Getenv("PRIVATE_KEY_PATH"))
+    if err != nil {
+        panic(err)
+    }
+
+    return publicKeyPEM
+}

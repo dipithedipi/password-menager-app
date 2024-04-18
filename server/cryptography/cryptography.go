@@ -68,7 +68,8 @@ func EncryptDataRSA(plaintext []byte) []byte {
 	return ciphertext
 }
 
-func DecryptDataRSA(ciphertext []byte, privateKeyPEM []byte) []byte {
+func DecryptDataRSA(ciphertext []byte) []byte {
+    privateKeyPEM := keys.ReadPrivateKeyPEM()
     privateKeyBlock, _ := pem.Decode(privateKeyPEM)
     privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
     if err != nil {
