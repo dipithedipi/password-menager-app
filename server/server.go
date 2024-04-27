@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+    "strconv"
 	"os"
 	"github.com/dipithedipi/password-manager/cryptography"
 	"github.com/dipithedipi/password-manager/routes"
@@ -22,7 +23,8 @@ func main() {
     // Generate encryption keys if they don't exist
     if _, err := os.Stat(os.Getenv("PUBLIC_KEY_PATH")); os.IsNotExist(err) {
         fmt.Println("[!] Generating crypto keys")
-        cryptography.GenerateKeysRSA(os.Getenv("PUBLIC_KEY_PATH"), os.Getenv("PRIVATE_KEY_PATH"), 2048)
+        keyLenght, _ := strconv.Atoi(os.Getenv("RSA_KEY_LENGTH"))
+        cryptography.GenerateKeysRSA(os.Getenv("PUBLIC_KEY_PATH"), os.Getenv("PRIVATE_KEY_PATH"), keyLenght)
         fmt.Print("[+] Keys generated and saved\n")
     } else {
         fmt.Println("[+] Crypto keys already exist")

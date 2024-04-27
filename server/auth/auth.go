@@ -45,3 +45,17 @@ func GenerateJWTToken(userId string, validPeriod string) (string, error) {
 	}
 	return token, nil
 }
+
+func ParseJWTToken(token string) (*jwt.StandardClaims, error) {
+	claims := &jwt.StandardClaims{}
+	tkn, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("JWT_SECRET_KEY")), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !tkn.Valid {
+		return nil, err
+	}
+	return claims, nil
+}

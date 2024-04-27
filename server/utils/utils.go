@@ -52,6 +52,7 @@ func CalculateExpireTimeInt64(minutes string) int64 {
 	return time.Now().Add(time.Minute * time.Duration(i)).Unix()
 }
 
+
 func CalculateExpireTime(minutes string) time.Time {
 	i, err := strconv.Atoi(minutes)
 	if err != nil {

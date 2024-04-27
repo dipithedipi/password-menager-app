@@ -21,7 +21,8 @@ model User {
   masterPasswordHash    String   @unique      // Hashed master password
   salt      String   @unique      // Salt used for hashing
   changedAt DateTime @updatedAt // Password change time, automatically set to the current time on update
-  otpSecret String // two-factor authentication secret
+  otpSecret String // two-factor authentication secret encrypted
+  publicKey String // public key 
 
   // -----------------------------------------------------------
   tokens          Token[]  // Relation to the Token model

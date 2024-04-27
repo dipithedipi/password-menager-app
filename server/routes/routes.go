@@ -75,7 +75,7 @@ func SyncRedisOTPSecret(clientPostgresDb *db.PrismaClient, clientRedisDb *redis.
         if user.OtpSecret != "" {
             // Add the OTP secret to the redis database
             encryptedOtpSecretBytes := cryptography.Base64Decode(user.OtpSecret)
-            unencryptedOtpSecret := cryptography.DecryptDataRSA(encryptedOtpSecretBytes)
+            unencryptedOtpSecret := cryptography.DecryptServerDataRSA(encryptedOtpSecretBytes)
 
             err = clientRedisDb.Set(context.Background(), user.ID, string(unencryptedOtpSecret), 0).Err()
             if err != nil {
@@ -101,7 +101,8 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     }))
 
     apiPassword := app.Group("/password")
-    apiPassword.Get("/jwt", controllers.TestJWT)
+    apiPassword.Post("/new", controllers.PostNewPassword)
+    apiPassword.Get("/get", controllers.GetPassword)
 
     // api.Get("/get-user", controllers.User)
     // api.Post("/login", controllers.Login)

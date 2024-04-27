@@ -52,24 +52,32 @@ func GenerateKeysRSA(publicKeyPath string, privateKeyPath string, keyLenght int)
     }
 }
 
-func EncryptDataRSA(plaintext []byte) []byte {
+func EncryptServerDataRSA(plaintext []byte) ([]byte, error) {
     publicKeyPEM := keys.ReadPublicKeyPEM()
+    return EncryptDataRSA(plaintext, publicKeyPEM)
+}
+
+func DecryptServerDataRSA(ciphertext []byte) []byte {
+    privateKeyPEM := keys.ReadPrivateKeyPEM()
+    return DecryptDataRSA(ciphertext, privateKeyPEM)
+}
+
+func EncryptDataRSA(plaintext []byte, publicKeyPEM []byte) ([]byte, error) {
 	publicKeyBlock, _ := pem.Decode(publicKeyPEM)
 	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
 	if err != nil {
-		panic(err)
+        return nil, err
 	}
 
 	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, publicKey.(*rsa.PublicKey), plaintext)
 	if err != nil {
-		panic(err)
+        return nil, err
 	}
 
-	return ciphertext
+	return ciphertext, nil
 }
 
-func DecryptDataRSA(ciphertext []byte) []byte {
-    privateKeyPEM := keys.ReadPrivateKeyPEM()
+func DecryptDataRSA(ciphertext []byte, privateKeyPEM []byte) []byte {
     privateKeyBlock, _ := pem.Decode(privateKeyPEM)
     privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
     if err != nil {
@@ -82,6 +90,20 @@ func DecryptDataRSA(ciphertext []byte) []byte {
     }
 
     return plaintext
+}
+
+func ConvertBase64PublicKeyToPEM(base64Key string) (string, error) {
+    // Decode the base64-encoded public key
+    decodedKey, err := base64.StdEncoding.DecodeString(base64Key)
+    if err != nil {
+        return "", fmt.Errorf("failed to decode public key: %v", err)
+    }
+
+    // add header and footer to the key
+    pemKey := string(decodedKey[:])
+    pemKey = "-----BEGIN RSA PUBLIC KEY-----\n" + pemKey + "\n-----END RSA PUBLIC KEY-----"
+
+    return pemKey, nil
 }
 
 // AES CBC (not working)
@@ -293,12 +315,12 @@ func generateRandomBytes(n uint32) ([]byte, error) {
 	return b, nil
 }
 
-func GenerateSalt(lenght uint32) []byte {
+func GenerateSalt(lenght uint32) ([]byte, error) {
 	salt, err := generateRandomBytes(lenght)
 	if err != nil {
 		fmt.Printf("[!] ERROR: generating salt %v", err)
-		panic(err)
+		return nil, err
 	}
 
-	return salt
+	return salt, nil
 }

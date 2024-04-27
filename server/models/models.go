@@ -5,12 +5,16 @@ type UserRegister struct {
     Email           string `json:"email"`
     PasswordHash    string `json:"password"`
     Salt            string `json:"salt"`
+    PublicKey       string `json:"public_key"`
 }
 
 type UserLogin struct {
     Email           string `json:"email"`
     PasswordHash    string `json:"password"`
     Otp             string `json:"otp"`
+}
+
+type PasswordSet struct {
 }
 
 type ArgonParams struct {

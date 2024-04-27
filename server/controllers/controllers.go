@@ -75,8 +75,8 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	encryptedStoredBytesOtpSecret := cryptography.EncryptDataRSA([]byte(otpSecret))
-	if encryptedStoredBytesOtpSecret == nil {
+	encryptedStoredBytesOtpSecret, err := cryptography.EncryptServerDataRSA([]byte(otpSecret))
+	if err != nil {
 		fmt.Printf("[!] ERROR: encrypting otp secret to store")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "could not create user",
@@ -84,12 +84,35 @@ func Register(c *fiber.Ctx) error {
 	}
 	encryptedStoredOtpSecret := cryptography.Base64Encode(encryptedStoredBytesOtpSecret)
 
+	otpSecretUri := auth.GenerateUriTOTPWithSecret(otpSecret, user.Email)
+
+	// convert public key to pem
+	publicKeyPEM, err := cryptography.ConvertBase64PublicKeyToPEM(user.PublicKey)
+	if err != nil {
+		fmt.Printf("[!] ERROR: converting public key to pem %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "public key not valid",
+		})
+	}
+
+	encOtpSecretUriBytes, err := cryptography.EncryptDataRSA([]byte(otpSecretUri), []byte(publicKeyPEM))
+	if err != nil {
+		fmt.Printf("[!] ERROR: encrypting otp secret to send back: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "could not create user",
+		})
+	}
+	
+	encOtpSecreturi := cryptography.Base64Encode(encOtpSecretUriBytes)
+
+	// add to db
 	createUser, err := clientPostgresDb.User.CreateOne(
 		db.User.Username.Set(user.Username),
 		db.User.Email.Set(user.Email),
 		db.User.MasterPasswordHash.Set(passwordHash),
 		db.User.Salt.Set(user.Salt),
 		db.User.OtpSecret.Set(encryptedStoredOtpSecret),
+		db.User.PublicKey.Set(user.PublicKey),
 	).Exec(ctx)
 
 	if err != nil {
@@ -123,35 +146,29 @@ func Register(c *fiber.Ctx) error {
 
 	clientRedisDb.Set(ctx, createUser.ID, otpSecret, 0)
 	fmt.Printf("[+] OTP secret stored in redis(%v:%v)\n", createUser.ID, otpSecret)
-
 	fmt.Printf("[+] Created user: %s\n", result)
-
-	otpSecretUri := auth.GenerateUriTOTPWithSecret(otpSecret, user.Email)
-	fmt.Printf("password lenght: %v\n", len(passwordHash))
-	fmt.Print("password hash: ", passwordHash, "\n")
-	// encryptedBytesOtpSecret, err := cryptography.EncryptAESGCM(otpSecretUri, []byte(passwordHash))
-	// if err != nil {
-	// 	fmt.Printf("[!] ERROR: encrypting otp secret to send back: %v", err)
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"message": "could not create user",
-	// 	})
-	// }
-	// encryptedOtpSecret := cryptography.Base64Encode(encryptedBytesOtpSecret)
-
-	// a := cryptography.Base64Decode(encryptedOtpSecret)
-	// z, _ := cryptography.DecryptAESCBC(a, []byte(passwordHash)) 	
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "User created successfully",
-		// "otpSecretUri": encryptedOtpSecret,
-		"otpSecretUriUnencrypted": otpSecretUri,
+		"otpSecretUri": encOtpSecreturi,
+		//"otpSecretUriUnencrypted": otpSecretUri,
 		// "otpSecretUriDecrypted": string(z),
 	})
 }
 
 func Salt(c *fiber.Ctx) error {
+	rawSalt, err := cryptography.GenerateSalt(p.SaltLength)
+	if err != nil {
+		fmt.Printf("[!] ERROR: generating salt %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "could not generate salt",
+		})
+	}
+
+	salt := cryptography.Base64Encode(rawSalt)
+
 	return c.JSON(fiber.Map{
-		"salt": cryptography.GenerateSalt(p.SaltLength),
+		"salt": salt,
 	})
 }
 
@@ -257,7 +274,20 @@ func Login(c *fiber.Ctx) error {
 	})
 }
 
-func TestJWT(c *fiber.Ctx) error {
+// func PostNewPassword(c *fiber.Ctx) error {
+// 	// get user id from jwt
+// 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+// 	claims, err := auth.ParseJWTToken(cookie)
+// 	if err != nil {
+// 		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+// 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+// 			"message": "jwt error",
+// 		})
+// 	}
+
+// }
+
+func GetPassword(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "jwt",
 	})
