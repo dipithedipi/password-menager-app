@@ -39,10 +39,9 @@ model Password {
   
   website     String    // Domain name
   username    String    // Username
-  description String?  // Description
+  description String?  @default("") // Description
 
-  password   String    // Hashed password
-  salt       String    // Salt used for hashing
+  password   String    // encrypted password
   changedAt  DateTime  @updatedAt // Password change time, automatically set to the current time on update
 
   userId     String    // Foreign key to the User model

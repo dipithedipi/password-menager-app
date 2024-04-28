@@ -274,18 +274,51 @@ func Login(c *fiber.Ctx) error {
 	})
 }
 
-// func PostNewPassword(c *fiber.Ctx) error {
-// 	// get user id from jwt
-// 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
-// 	claims, err := auth.ParseJWTToken(cookie)
-// 	if err != nil {
-// 		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
-// 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-// 			"message": "jwt error",
-// 		})
-// 	}
+func PostNewPassword(c *fiber.Ctx) error {
+	// get user id from jwt
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "jwt error",
+		})
+	}
 
-// }
+	var passwordFields models.PasswordSet
+	if err := c.BodyParser(&passwordFields); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(passwordFields) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
+
+	// add password linked to user id in DB
+	_, err = clientPostgresDb.Password.CreateOne(
+		db.Password.Website.Set(passwordFields.Domain),
+		db.Password.Username.Set(passwordFields.Username),
+		db.Password.Password.Set(passwordFields.Password),
+		db.Password.User.Link(
+			db.User.ID.Equals(claims.Issuer),
+		),
+		db.Password.Description.Set(passwordFields.Description),
+	).Exec(context.Background())
+
+	if err != nil {
+		fmt.Printf("[!] Error occurred creating password: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error adding password",
+		})
+	}
+
+	fmt.Print("[+] Password added successfully\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Password added successfully",
+	})
+}
 
 func GetPassword(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{

@@ -15,6 +15,10 @@ type UserLogin struct {
 }
 
 type PasswordSet struct {
+    Domain          string `json:"domain"`
+    Username        string `json:"username"`
+    Description     string `json:"description"`
+    Password        string `json:"password"`
 }
 
 type ArgonParams struct {
