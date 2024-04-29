@@ -41,6 +41,7 @@ model Password {
   username    String    // Username
   description String?  @default("") // Description
 
+  otpProtected Boolean   @default(false) // Two-factor authentication status, default is false
   password   String    // encrypted password
 
   userId     String    // Foreign key to the User model

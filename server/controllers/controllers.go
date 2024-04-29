@@ -19,7 +19,7 @@ import (
 )
 
 var clientPostgresDb *db.PrismaClient
-var clientRedisDb *redis.Client 
+var clientRedisDb *redis.Client
 var p = &models.ArgonParams{
 	Memory:      64 * 1024,
 	Iterations:  3,
@@ -27,7 +27,6 @@ var p = &models.ArgonParams{
 	SaltLength:  16,
 	KeyLength:   32,
 }
-
 
 func SetPostgresDbClient(client *db.PrismaClient) {
 	clientPostgresDb = client
@@ -102,7 +101,7 @@ func Register(c *fiber.Ctx) error {
 			"message": "could not create user",
 		})
 	}
-	
+
 	encOtpSecreturi := cryptography.Base64Encode(encOtpSecretUriBytes)
 
 	// add to db
@@ -149,7 +148,7 @@ func Register(c *fiber.Ctx) error {
 	fmt.Printf("[+] Created user: %s\n", result)
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "User created successfully",
+		"message":      "User created successfully",
 		"otpSecretUri": encOtpSecreturi,
 		//"otpSecretUriUnencrypted": otpSecretUri,
 		// "otpSecretUriDecrypted": string(z),
@@ -214,7 +213,7 @@ func Login(c *fiber.Ctx) error {
 			"message": "Internal server error",
 		})
 	}
-	
+
 	if !equal {
 		fmt.Printf("[-] Login: Password wrong\n")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -266,7 +265,7 @@ func Login(c *fiber.Ctx) error {
 			"message": "Internal server error",
 		})
 	}
-	fmt.Printf("[+] Updated last login: \n",)
+	fmt.Printf("[+] Updated last login: \n")
 
 	c.Cookie(&cookie)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -305,6 +304,7 @@ func PostNewPassword(c *fiber.Ctx) error {
 			db.User.ID.Equals(claims.Issuer),
 		),
 		db.Password.Description.Set(passwordFields.Description),
+		db.Password.OtpProtected.Set(passwordFields.Otp),
 	).Exec(context.Background())
 
 	if err != nil {
@@ -330,19 +330,19 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 			"message": "jwt error",
 		})
 	}
-	
+
 	var passwordRequest models.PasswordRequestSearch
 	if err := c.BodyParser(&passwordRequest); err != nil {
 		return fiber.ErrBadRequest
 	}
-	
+
 	if !utils.CheckAllFieldsHaveValue(passwordRequest) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "missing required fields",
 		})
 	}
 
-	// get password field without the password linked to user id in DB 
+	// get password field without the password linked to user id in DB
 	result, err := clientPostgresDb.Password.FindMany(
 		db.Password.Website.Contains(passwordRequest.Domain),
 		db.Password.UserID.Equals(claims.Issuer),
@@ -370,7 +370,7 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 	for _, password := range result {
 		interfaceSlice = append(interfaceSlice, password)
 	}
-	
+
 	fieldsToRemove := []string{"userId", "password"}
 	clearedResult, err := utils.ClearJsonFields(interfaceSlice, fieldsToRemove)
 	if err != nil {
@@ -383,7 +383,7 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 	fmt.Printf("[+] Password found:")
 	utils.PrintFormattedJSON(clearedResult)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Password found",
+		"message":   "Password found",
 		"passwords": clearedResult,
 	})
 }
@@ -397,18 +397,18 @@ func GetPassword(c *fiber.Ctx) error {
 			"message": "jwt error",
 		})
 	}
-	
+
 	var passwordRequest models.PasswordRequestInfo
 	if err := c.BodyParser(&passwordRequest); err != nil {
 		return fiber.ErrBadRequest
 	}
-	
+
 	if !utils.CheckAllFieldsHaveValue(passwordRequest) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "missing required fields",
 		})
 	}
-	
+
 	result, err := clientPostgresDb.Password.FindMany(
 		db.Password.ID.Equals(passwordRequest.PasswordId),
 		db.Password.Website.Contains(passwordRequest.Domain),
@@ -429,9 +429,29 @@ func GetPassword(c *fiber.Ctx) error {
 		})
 	}
 
+	// check if otp is needed
+	if result[0].OtpProtected {
+		fmt.Printf("[+] Password is protected by OTP\n")
+		otpSecret := clientRedisDb.Get(context.Background(), claims.Issuer).Val()
+		if otpSecret == "" {
+			fmt.Printf("[-] OTP: No secret found\n")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "OTP error",
+			})
+		}
+		if !auth.VerifyOTP(otpSecret, passwordRequest.Otp) {
+			fmt.Printf("[-] OTP: Invalid code\n")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Invalid OTP",
+			})
+		}
+
+		fmt.Printf("[+] OTP: Access granted\n")
+	}
+
 	fmt.Printf("[+] Password info found\n")
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Password found",
+		"message":  "Password found",
 		"password": result,
 	})
 }

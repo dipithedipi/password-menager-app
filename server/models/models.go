@@ -19,6 +19,7 @@ type PasswordSet struct {
     Username        string `json:"username"`
     Description     string `json:"description"`
     Password        string `json:"password"`
+    Otp             bool   `json:"otp"`
 }
 
 type PasswordRequestSearch struct {
@@ -28,6 +29,7 @@ type PasswordRequestSearch struct {
 type PasswordRequestInfo struct {
     PasswordId      string `json:"passwordId"`
     Domain          string `json:"domain"`
+    Otp             string `json:"otp"`
 }
 
 type ArgonParams struct {
