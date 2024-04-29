@@ -21,6 +21,15 @@ type PasswordSet struct {
     Password        string `json:"password"`
 }
 
+type PasswordRequestSearch struct {
+    Domain          string `json:"domain"`
+}
+
+type PasswordRequestInfo struct {
+    PasswordId      string `json:"passwordId"`
+    Domain          string `json:"domain"`
+}
+
 type ArgonParams struct {
     Memory          uint32
     Iterations      uint32

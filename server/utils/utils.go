@@ -5,6 +5,7 @@ import (
 	"net/mail"
 	"reflect"
 	"strconv"
+	"encoding/json"
 	"time"
 )
 
@@ -61,4 +62,50 @@ func CalculateExpireTime(minutes string) time.Time {
 	}
 
 	return time.Now().Add(time.Minute * time.Duration(i))
+}
+
+func ClearJsonFields(jsonArray []interface{}, fieldsToRemove []string) ([]interface{}, error) {
+	var modifiedJsonArray []interface{}
+
+	for _, obj := range jsonArray {
+		jsonBytes, err := json.Marshal(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		var jsonMap map[string]interface{}
+		if err := json.Unmarshal(jsonBytes, &jsonMap); err != nil {
+			return nil, err
+		}
+
+		for _, field := range fieldsToRemove {
+			delete(jsonMap, field)
+		}
+
+		modifiedJsonBytes, err := json.Marshal(jsonMap)
+		if err != nil {
+			return nil, err
+		}
+
+		var modifiedObj interface{}
+		if err := json.Unmarshal(modifiedJsonBytes, &modifiedObj); err != nil {
+			return nil, err
+		}
+
+		modifiedJsonArray = append(modifiedJsonArray, modifiedObj)
+	}
+
+	return modifiedJsonArray, nil
+}
+
+func PrintFormattedJSON[T any](items []T) {
+    for _, item := range items {
+        // Converti l'elemento in JSON.
+        jsonData, err := json.MarshalIndent(item, "", " ")
+        if err != nil {
+            fmt.Println("Errore durante la conversione in JSON:", err)
+        }
+        // Stampa il JSON formattato.
+        fmt.Println(string(jsonData))
+    }
 }

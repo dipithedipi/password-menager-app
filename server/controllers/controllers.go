@@ -320,9 +320,119 @@ func PostNewPassword(c *fiber.Ctx) error {
 	})
 }
 
+func GetPasswordPreview(c *fiber.Ctx) error {
+	// get user id from jwt
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "jwt error",
+		})
+	}
+	
+	var passwordRequest models.PasswordRequestSearch
+	if err := c.BodyParser(&passwordRequest); err != nil {
+		return fiber.ErrBadRequest
+	}
+	
+	if !utils.CheckAllFieldsHaveValue(passwordRequest) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
+
+	// get password field without the password linked to user id in DB 
+	result, err := clientPostgresDb.Password.FindMany(
+		db.Password.Website.Contains(passwordRequest.Domain),
+		db.Password.UserID.Equals(claims.Issuer),
+	).Omit(
+		db.Password.Password.Field(),
+		db.Password.UserID.Field(),
+	).Exec(context.Background())
+
+	if err != nil {
+		fmt.Printf("[!] Error occurred finding password: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding password",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] No password found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No password found",
+		})
+	}
+
+	// Convertiamo []db.PasswordModel in []interface{}
+	var interfaceSlice []interface{}
+	for _, password := range result {
+		interfaceSlice = append(interfaceSlice, password)
+	}
+	
+	fieldsToRemove := []string{"userId", "password"}
+	clearedResult, err := utils.ClearJsonFields(interfaceSlice, fieldsToRemove)
+	if err != nil {
+		fmt.Printf("[!] Error occurred clearing json fields: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error elaborating password",
+		})
+	}
+
+	fmt.Printf("[+] Password found:")
+	utils.PrintFormattedJSON(clearedResult)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Password found",
+		"passwords": clearedResult,
+	})
+}
+
 func GetPassword(c *fiber.Ctx) error {
-	return c.JSON(fiber.Map{
-		"message": "jwt",
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "jwt error",
+		})
+	}
+	
+	var passwordRequest models.PasswordRequestInfo
+	if err := c.BodyParser(&passwordRequest); err != nil {
+		return fiber.ErrBadRequest
+	}
+	
+	if !utils.CheckAllFieldsHaveValue(passwordRequest) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
+	
+	result, err := clientPostgresDb.Password.FindMany(
+		db.Password.ID.Equals(passwordRequest.PasswordId),
+		db.Password.Website.Contains(passwordRequest.Domain),
+		db.Password.UserID.Equals(claims.Issuer),
+	).Exec(context.Background())
+
+	if err != nil {
+		fmt.Printf("[!] Error occurred finding password: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding password",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] No password found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No password found",
+		})
+	}
+
+	fmt.Printf("[+] Password info found\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Password found",
+		"password": result,
 	})
 }
 

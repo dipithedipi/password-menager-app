@@ -102,9 +102,9 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
 
     apiPassword := app.Group("/password")
     apiPassword.Post("/new", controllers.PostNewPassword)
+    apiPassword.Get("/search", controllers.GetPasswordPreview)
     apiPassword.Get("/get", controllers.GetPassword)
 
     // api.Get("/get-user", controllers.User)
-    // api.Post("/login", controllers.Login)
     // api.Post("/logout", controllers.Logout)
 }

@@ -33,7 +33,7 @@ model User {
 }
 
 model Password {
-  id         Int       @id @unique @default(autoincrement()) // Unique identifier for the password, auto-incremented
+  id         String    @id @unique @default(uuid()) // Unique identifier for the password, auto-incremented
   createdAt  DateTime  @default(now()) // Creation time, default is the current time
   updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
   
@@ -42,7 +42,6 @@ model Password {
   description String?  @default("") // Description
 
   password   String    // encrypted password
-  changedAt  DateTime  @updatedAt // Password change time, automatically set to the current time on update
 
   userId     String    // Foreign key to the User model
   user       User      @relation(fields: [userId], references: [id]) // Relation to the User model
@@ -50,7 +49,7 @@ model Password {
 
 // This block defines a "Token" model. This model is also related to the "User" model through a relation.
 model Token {
-  id         Int       @id @unique @default(autoincrement()) // Unique identifier for the token, auto-incremented
+  id         String       @id @unique @default(uuid()) // Unique identifier for the token, auto-incremented
   createdAt  DateTime  @default(now()) // Creation time, default is the current time
   updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
   tokenValue String    @unique // Unique email token
@@ -63,7 +62,7 @@ model Token {
 }
 
 model Event {
-  id         Int       @id @unique @default(autoincrement()) // Unique identifier for the event, auto-incremented
+  id         String       @id @unique @default(uuid()) // Unique identifier for the event, auto-incremented
   createdAt  DateTime  @default(now()) // Creation time, default is the current time
   updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
   title      String    // Event title
