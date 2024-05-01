@@ -8,8 +8,8 @@ import (
 
 	"github.com/dipithedipi/password-manager/controllers" // importing the routes package
 	"github.com/dipithedipi/password-manager/cryptography"
+    "github.com/dipithedipi/password-manager/auth"
 	"github.com/dipithedipi/password-manager/prisma/db"
-	jwtware "github.com/gofiber/contrib/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/redis/go-redis/v9"
 )
@@ -92,15 +92,12 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
 
     apiUser := app.Group("/user")
     apiUser.Post("/register", controllers.Register)
-    apiUser.Get("/register/salt", controllers.Salt)
+    apiUser.Get("/register/salt", controllers.RandomSalt)
     apiUser.Post("/login", controllers.Login)
+    apiUser.Get("/login/salt", controllers.GetSaltFromUser)
+    apiUser.Post("/logout", controllers.Logout)
 
-    app.Use(jwtware.New(jwtware.Config{
-        SigningKey: jwtware.SigningKey{Key: []byte(os.Getenv("JWT_SECRET_KEY"))},
-        TokenLookup: "cookie:" + os.Getenv("JWT_COOKIE_TOKEN_NAME"),
-    }))
-
-    apiPassword := app.Group("/password")
+    apiPassword := app.Group("/password", auth.MiddlewareJWTAuth(clientRedisDb))
     apiPassword.Post("/new", controllers.PostNewPassword)
     apiPassword.Get("/search", controllers.GetPasswordPreview)
     apiPassword.Get("/get", controllers.GetPassword)

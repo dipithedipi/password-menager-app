@@ -19,7 +19,7 @@ model User {
  
   // -----------------------------------------------------------
   masterPasswordHash    String   @unique      // Hashed master password
-  salt      String   @unique      // Salt used for hashing
+  salt      String   @unique      // Salt used for client hashing
   changedAt DateTime @updatedAt // Password change time, automatically set to the current time on update
   otpSecret String // two-factor authentication secret encrypted
   publicKey String // public key 
@@ -63,13 +63,11 @@ model Token {
 }
 
 model Event {
-  id         String       @id @unique @default(uuid()) // Unique identifier for the event, auto-incremented
+  id         String    @id @unique @default(uuid()) // Unique identifier for the event, auto-incremented
   createdAt  DateTime  @default(now()) // Creation time, default is the current time
   updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
   title      String    // Event title
   description String?  // Event description
-  location   String?   // Event location
-  time       DateTime  // Event time
   ipAddress  String    // Event IP address
 
   userId     String    // Foreign key to the User model

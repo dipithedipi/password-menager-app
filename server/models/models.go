@@ -14,6 +14,10 @@ type UserLogin struct {
     Otp             string `json:"otp"`
 }
 
+type UserSaltLogin struct {
+    Email           string `json:"email"`
+}
+
 type PasswordSet struct {
     Domain          string `json:"domain"`
     Username        string `json:"username"`

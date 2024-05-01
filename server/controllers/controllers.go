@@ -11,6 +11,7 @@ import (
 
 	"github.com/dipithedipi/password-manager/auth"
 	"github.com/dipithedipi/password-manager/cryptography"
+	"github.com/dipithedipi/password-manager/event"
 	"github.com/dipithedipi/password-manager/models"
 	"github.com/dipithedipi/password-manager/prisma/db"
 	"github.com/dipithedipi/password-manager/utils"
@@ -35,6 +36,8 @@ func SetPostgresDbClient(client *db.PrismaClient) {
 func SetRedisDbClient(client *redis.Client) {
 	clientRedisDb = client
 }
+
+// ------------------- api controllers -------------------
 
 func Register(c *fiber.Ctx) error {
 	var user models.UserRegister
@@ -147,6 +150,16 @@ func Register(c *fiber.Ctx) error {
 	fmt.Printf("[+] OTP secret stored in redis(%v:%v)\n", createUser.ID, otpSecret)
 	fmt.Printf("[+] Created user: %s\n", result)
 
+	// add new event do user db
+
+	err = event.NewEvent(clientPostgresDb, "User created", "", c.IP(), createUser.ID)
+	if err != nil {
+		fmt.Printf("[!] ERROR: creating event %v\n", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Could not create user",
+		})
+	}
+
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message":      "User created successfully",
 		"otpSecretUri": encOtpSecreturi,
@@ -155,7 +168,56 @@ func Register(c *fiber.Ctx) error {
 	})
 }
 
-func Salt(c *fiber.Ctx) error {
+func GetSaltFromUser(c *fiber.Ctx) error {
+	var user models.UserSaltLogin
+
+	if err := c.BodyParser(&user); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(user) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
+
+	if !utils.ValidateEmail(user.Email) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "invalid email",
+		})
+	}
+
+	retrivedUserDb, err := clientPostgresDb.User.FindMany(
+		db.User.Email.Equals(user.Email),
+	).Select(
+		db.User.Salt.Field(),
+	).Exec(context.Background())
+	if errors.Is(err, db.ErrNotFound) {
+		fmt.Printf("[-] No record for salt with email: %s\n", user.Email)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Email incorrect",
+		})
+	} else if err != nil {
+		fmt.Printf("[!] Error occurred finding salt from email in database: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	if len(retrivedUserDb) == 0 {
+		fmt.Printf("[-] No record for salt with email: %s\n", user.Email)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Email not found",
+		})
+	}
+
+	salt := retrivedUserDb[0].Salt
+	return c.JSON(fiber.Map{
+		"salt": salt,
+	})
+}
+
+func RandomSalt(c *fiber.Ctx) error {
 	rawSalt, err := cryptography.GenerateSalt(p.SaltLength)
 	if err != nil {
 		fmt.Printf("[!] ERROR: generating salt %v", err)
@@ -216,6 +278,15 @@ func Login(c *fiber.Ctx) error {
 
 	if !equal {
 		fmt.Printf("[-] Login: Password wrong\n")
+		// Event login failed
+		err = event.NewEvent(clientPostgresDb, "Login failed", "User used a wrong password", c.IP(), retrivedUserDb[0].ID)
+		if err != nil {
+			fmt.Printf("[!] Error occurred creating event: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Internal server error",
+			})
+		}
+
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Password incorrect",
 		})
@@ -231,6 +302,16 @@ func Login(c *fiber.Ctx) error {
 	}
 	if !auth.VerifyOTP(otpSecret, user.Otp) {
 		fmt.Printf("[-] OTP: Invalid code\n")
+
+		// Event login failed
+		err = event.NewEvent(clientPostgresDb, "Login failed", "User use an OTP code invalid", c.IP(), retrivedUserDb[0].ID)
+		if err != nil {
+			fmt.Printf("[!] Error occurred creating event: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Internal server error",
+			})
+		}
+
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Invalid OTP",
 		})
@@ -265,8 +346,17 @@ func Login(c *fiber.Ctx) error {
 			"message": "Internal server error",
 		})
 	}
-	fmt.Printf("[+] Updated last login: \n")
 
+	// Event login success
+	err = event.NewEvent(clientPostgresDb, "Login success", "User logged in", c.IP(), retrivedUserDb[0].ID)
+	if err != nil {
+		fmt.Printf("[!] Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	fmt.Printf("[+] Updated last login: \n")
 	c.Cookie(&cookie)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login successful",
@@ -308,9 +398,18 @@ func PostNewPassword(c *fiber.Ctx) error {
 	).Exec(context.Background())
 
 	if err != nil {
-		fmt.Printf("[!] Error occurred creating password: %s", err)
+		fmt.Printf("[!] Error occurred adding password: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Error adding password",
+		})
+	}
+
+	// event password added
+	err = event.NewEvent(clientPostgresDb, "Password added", fmt.Sprintf("User added a new password for %s", passwordFields.Domain), c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
 		})
 	}
 
@@ -380,6 +479,15 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 		})
 	}
 
+	// event password preview
+	err = event.NewEvent(clientPostgresDb, "Password preview", fmt.Sprintf("User previewed a passwords for %s", passwordRequest.Domain), c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
 	fmt.Printf("[+] Password found:")
 	utils.PrintFormattedJSON(clearedResult)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -394,7 +502,7 @@ func GetPassword(c *fiber.Ctx) error {
 	if err != nil {
 		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "jwt error",
+			"message": "Jwt error",
 		})
 	}
 
@@ -405,7 +513,7 @@ func GetPassword(c *fiber.Ctx) error {
 
 	if !utils.CheckAllFieldsHaveValue(passwordRequest) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "missing required fields",
+			"message": "Missing required fields",
 		})
 	}
 
@@ -440,13 +548,40 @@ func GetPassword(c *fiber.Ctx) error {
 			})
 		}
 		if !auth.VerifyOTP(otpSecret, passwordRequest.Otp) {
+			// event password info failed otp
+			err = event.NewEvent(clientPostgresDb, "Password info request failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+			if err != nil {
+				fmt.Printf("[!] Error occurred creating event: %s", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"message": "Internal server error",
+				})
+			}
+
 			fmt.Printf("[-] OTP: Invalid code\n")
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "Invalid OTP",
 			})
 		}
 
+		// event password info success otp
+		err = event.NewEvent(clientPostgresDb, "Password info request success", fmt.Sprintf("User viewed a password for %s protected by OTP", passwordRequest.Domain), c.IP(), claims.Issuer)
+		if err != nil {
+			fmt.Printf("[!] Error occurred creating event: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Internal server error",
+			})
+		}
+
 		fmt.Printf("[+] OTP: Access granted\n")
+	}
+
+	// event password info
+	err = event.NewEvent(clientPostgresDb, "Password info request success", fmt.Sprintf("User viewed a password for %s", passwordRequest.Domain), c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
 	}
 
 	fmt.Printf("[+] Password info found\n")
@@ -456,29 +591,56 @@ func GetPassword(c *fiber.Ctx) error {
 	})
 }
 
-// func User(c *fiber.Ctx) error {
-// 	cookie := c.Cookies("jwt")
+func Logout(c *fiber.Ctx) error {
+	// add the JWT token to redis blacklist
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	// check if cookie is null
+	if cookie == "" {
+		fmt.Printf("[+] Logout: cookie is null")
+		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
+			"message": "Cookie is null",
+		})
+	}
 
-// 	token, err := jwt.ParseWithClaims(cookie, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
-// 		return []byte(SecretKey), nil
-// 	})
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
 
-// 	if err != nil {
-// 		c.Status(fiber.StatusUnauthorized)
-// 		return c.JSON(fiber.Map{
-// 			"message": "unauthenticated",
-// 		})
-// 	}
+	tokenRemainTime := auth.TokenRemainingTime(claims)
+	// check if token is already expired
+	if tokenRemainTime <= 0 {
+		fmt.Printf("[+] Logout: token is already expired")
+		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
+			"message": "Token is already expired",
+		})
+	}
 
-// 	claims := token.Claims.(*jwt.StandardClaims)
+	_, err = clientRedisDb.Set(context.Background(), cookie, claims.Issuer, time.Duration(tokenRemainTime)*time.Second).Result()
+	if err != nil {
+		fmt.Printf("[!] Error occurred adding token to Redis blacklist: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
 
-// 	var user models.User
+	// clear the cookie
+	cookieClear := fiber.Cookie{
+		Name:     os.Getenv("JWT_COOKIE_TOKEN_NAME"),
+		Value:    "",
+		Expires:  time.Now().Add(-time.Hour),
+		HTTPOnly: true,
+	}
+	c.Cookie(&cookieClear)
 
-// 	database.DB.Where("id = ?", claims.Issuer).First(&user)
-
-// 	return c.JSON(user)
-
-// }
+	fmt.Printf("[+] User %s logout\n", claims.Issuer)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message":  "Logout successful",
+	})
+}
 
 // func Logout(c *fiber.Ctx) error {
 // 	cookie := fiber.Cookie{
