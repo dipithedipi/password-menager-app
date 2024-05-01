@@ -6,10 +6,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/dipithedipi/password-manager/auth"
 	"github.com/dipithedipi/password-manager/controllers" // importing the routes package
 	"github.com/dipithedipi/password-manager/cryptography"
-    "github.com/dipithedipi/password-manager/auth"
 	"github.com/dipithedipi/password-manager/prisma/db"
+	"github.com/dipithedipi/password-manager/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/redis/go-redis/v9"
 )
@@ -86,6 +87,66 @@ func SyncRedisOTPSecret(clientPostgresDb *db.PrismaClient, clientRedisDb *redis.
     fmt.Println("[+] Redis database is now in sync with the Postgres database")
 }
 
+func SetupKAnonymity(clientPostgresDb *db.PrismaClient) {
+    // check if the database is empty
+    result, err := clientPostgresDb.PasswordLeak.FindMany().Take(100).Exec(context.Background())
+    if err != nil {
+        fmt.Println("[!] Error checking if the password leaked database is empty")
+        panic(err)
+    }
+
+    if len(result) > 0 {
+        fmt.Println("[+] Password leaked database is already populated")
+    } else {
+        // first time setup
+        // check if the file exists or is empty
+        _, err := os.Stat("wordlist.tmp");
+        if os.IsNotExist(err) {
+
+            // download a file 
+            fmt.Println("[+] Downloading the starting wordlist file")
+            err := utils.DownloadFile("wordlist.tmp", os.Getenv("K_ANONYMITY_DEFAULT_WORDLIST_LINK"))
+            if err != nil {
+                fmt.Println("[!] Error downloading the starting wordlist file")
+                panic(err)
+            }
+        }
+
+        // read the file
+        lines, err := utils.ReadFileContent("wordlist.tmp")
+        if err != nil {
+            fmt.Println("[!] Error reading the starting wordlist file")
+            panic(err)
+        }
+
+        // check if the file is empty
+        if len(lines) == 0 {
+            fmt.Println("[!] Error: The starting wordlist file is empty")
+            panic(err)
+        }
+
+        // insert the data into the database
+        for _, line := range lines {
+            _, err := clientPostgresDb.PasswordLeak.CreateOne(
+                db.PasswordLeak.PasswordHash.Set(cryptography.Sha1(line)),
+            ).Exec(context.Background())
+            if err != nil {
+                fmt.Println("[!] Error inserting the starting wordlist file into the database")
+                panic(err)
+            }
+        }
+
+        // delete the file
+        err = os.Remove("wordlist.tmp")
+        if err != nil {
+            fmt.Println("[!] Error deleting the starting wordlist file")
+            panic(err)
+        }
+
+        fmt.Println("[+] Password leaked database is now populated")
+    }
+}
+
 func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *redis.Client) {
     controllers.SetPostgresDbClient(clientPostgresDb)
     controllers.SetRedisDbClient(clientRedisDb)
@@ -102,6 +163,8 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     apiPassword.Get("/search", controllers.GetPasswordPreview)
     apiPassword.Get("/get", controllers.GetPassword)
 
+    apiUtils := app.Group("/utils")
+    apiUtils.Get("/checkPassword", controllers.CheckPasswordLeak)
+
     // api.Get("/get-user", controllers.User)
-    // api.Post("/logout", controllers.Logout)
 }

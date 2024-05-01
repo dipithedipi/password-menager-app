@@ -642,18 +642,51 @@ func Logout(c *fiber.Ctx) error {
 	})
 }
 
-// func Logout(c *fiber.Ctx) error {
-// 	cookie := fiber.Cookie{
-// 		Name:     "jwt",
-// 		Value:    "",
-// 		Expires:  time.Now().Add(-time.Hour), //Sets the expiry time an hour ago in the past.
-// 		HTTPOnly: true,
-// 	}
+func CheckPasswordLeak(c *fiber.Ctx) error {
+	var passwordCheck models.PasswordLeakCheck
 
-// 	c.Cookie(&cookie)
+	if err := c.BodyParser(&passwordCheck); err != nil {
+		return fiber.ErrBadRequest
+	}
 
-// 	return c.JSON(fiber.Map{
-// 		"message": "success",
-// 	})
+	if !utils.CheckAllFieldsHaveValue(passwordCheck) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
 
-// }
+	// check if the password is in the password leaked database
+	result, err := clientPostgresDb.PasswordLeak.FindMany(
+		db.PasswordLeak.PasswordHash.Contains(passwordCheck.PasswordPartialHash),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Error occurred finding password in leaked database: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	if len(result) > 0 {
+		possiblePasswordHash := []string{}
+		// check if the partial hash is the start of the password hash
+		for _, password := range result {
+			if strings.HasPrefix(password.PasswordHash, passwordCheck.PasswordPartialHash) {
+				possiblePasswordHash = append(possiblePasswordHash, password.PasswordHash)
+			}
+		}
+
+		if len(possiblePasswordHash) > 0 {
+			fmt.Printf("[+] Password found in leaked database\n")
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"message": "Possible password found in leaked database",
+				"result":  true,
+				"hashes": possiblePasswordHash,
+			})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Password safe",
+		"result": false,
+	})
+}

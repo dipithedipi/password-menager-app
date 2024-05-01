@@ -40,6 +40,10 @@ type PasswordRequestInfo struct {
     Otp             string `json:"otp"`
 }
 
+type PasswordLeakCheck struct {
+    PasswordPartialHash        string `json:"password"`
+}
+
 type ArgonParams struct {
     Memory          uint32
     Iterations      uint32

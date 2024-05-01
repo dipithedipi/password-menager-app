@@ -51,6 +51,9 @@ func main() {
     // Sync the redis database with otp secrets decrypted from the postgres database
     routes.SyncRedisOTPSecret(clientPostgresDb, clientRedisDb)
 
+    // Set up k-anonymity
+    routes.SetupKAnonymity(clientPostgresDb)
+
     // Create a new Fiber app
     app := fiber.New()
     routes.Setup(app, clientPostgresDb, clientRedisDb)

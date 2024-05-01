@@ -78,3 +78,10 @@ enum TokenType {
   WEB // From web
   APP // From phone
 }
+
+// -----------------------------------------------------------
+model PasswordLeak {
+  id         String    @id @unique @default(uuid()) // Unique identifier for the leak, auto-incremented
+  createdAt  DateTime  @default(now()) // Creation time, default is the current time
+  passwordHash   String    // Password
+}

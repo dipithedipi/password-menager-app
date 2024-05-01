@@ -1,22 +1,24 @@
 package cryptography
 
 import (
-	"github.com/dipithedipi/password-manager/models"
-    "github.com/dipithedipi/password-manager/cryptography/keys"
-	"golang.org/x/crypto/argon2"
-    "crypto/rand"
-    "crypto/rsa"
-    "crypto/x509"
-    "errors"
-    "strings"
-    "crypto/cipher"
-    "bytes"
-    "crypto/subtle"
-    "encoding/base64"
-    "crypto/aes"
-    "encoding/pem"
-    "os"
+	"bytes"
+	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/subtle"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"errors"
 	"fmt"
+	"os"
+	"strings"
+
+	"github.com/dipithedipi/password-manager/cryptography/keys"
+	"github.com/dipithedipi/password-manager/models"
+	"golang.org/x/crypto/argon2"
 )
 
 // RSA
@@ -302,6 +304,13 @@ func DecodeHash(encodedHash string) (p *models.ArgonParams, salt, hash []byte, e
     p.KeyLength = uint32(len(hash))
 
     return p, salt, hash, nil
+}
+
+// Sha1
+func Sha1(data string) string {
+    h := crypto.SHA1.New()
+    h.Write([]byte(data))
+    return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 // other
