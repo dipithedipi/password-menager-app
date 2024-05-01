@@ -319,7 +319,7 @@ func Login(c *fiber.Ctx) error {
 
 	fmt.Printf("[+] OTP: Access granted\n")
 
-	jwtToken, err := auth.GenerateJWTToken(retrivedUserDb[0].ID, os.Getenv("JWT_EXPIRES_IN"))
+	jwtToken, err := auth.GenerateJWTToken(retrivedUserDb[0].ID, c.IP(), os.Getenv("JWT_EXPIRES_IN"))
 	if err != nil {
 		fmt.Printf("[!] Error occurred generating JWT token: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

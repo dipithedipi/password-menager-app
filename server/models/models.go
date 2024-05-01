@@ -1,5 +1,9 @@
 package models
 
+import (
+    "github.com/golang-jwt/jwt"
+)
+
 type UserRegister struct {
     Username        string `json:"username"`
     Email           string `json:"email"`
@@ -42,4 +46,9 @@ type ArgonParams struct {
     Parallelism     uint8
     SaltLength      uint32
     KeyLength       uint32
+}
+
+type CustomJWTClaims struct {
+	jwt.StandardClaims
+	Ip string
 }

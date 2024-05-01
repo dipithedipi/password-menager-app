@@ -11,6 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/dipithedipi/password-manager/utils"
+	"github.com/dipithedipi/password-manager/models"
 	"github.com/golang-jwt/jwt"
 	"github.com/xlzd/gotp"
 )
@@ -38,21 +39,26 @@ func VerifyOTP(randomSecret string, userTotp string) bool {
 }
 
 // JWT
-func GenerateJWTToken(userId string, validPeriod string) (string, error) {
-	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
-		Issuer:    userId,
-		ExpiresAt: utils.CalculateExpireTimeInt64(validPeriod),
-	})
+func GenerateJWTToken(userId string, ip string, validPeriod string) (string, error) {
+	claims := models.CustomJWTClaims{
+		StandardClaims: jwt.StandardClaims{
+			Issuer:    userId,
+			ExpiresAt: utils.CalculateExpireTimeInt64(validPeriod),
+		},
+		Ip: ip,
+	}
 
-	token, err := claims.SignedString([]byte(os.Getenv("JWT_SECRET_KEY")))
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(os.Getenv("JWT_SECRET_KEY")))
 	if err != nil {
 		return "", err
 	}
-	return token, nil
+
+	return signedToken, nil
 }
 
-func ParseJWTToken(token string) (*jwt.StandardClaims, error) {
-	claims := &jwt.StandardClaims{}
+func ParseJWTToken(token string) (*models.CustomJWTClaims, error) {
+	claims := &models.CustomJWTClaims{}
 	tkn, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("JWT_SECRET_KEY")), nil
 	})
@@ -60,7 +66,7 @@ func ParseJWTToken(token string) (*jwt.StandardClaims, error) {
 		return nil, err
 	}
 	if !tkn.Valid {
-		return nil, err
+		return nil, fmt.Errorf("invalid token")
 	}
 	return claims, nil
 }
@@ -76,8 +82,8 @@ func VerifyJWTToken(token string) (bool, error) {
 	return true, nil
 }
 
-func TokenRemainingTime(token *jwt.StandardClaims) int64 {
-	return token.ExpiresAt - time.Now().Unix()
+func TokenRemainingTime(claims *models.CustomJWTClaims) int64 {
+	return claims.ExpiresAt - time.Now().Unix()
 }
 
 func MiddlewareJWTAuth(clientRedisDb *redis.Client) fiber.Handler {
@@ -128,6 +134,21 @@ func MiddlewareJWTAuth(clientRedisDb *redis.Client) fiber.Handler {
 			fmt.Print("[!] Middleware JWT Auth: token found in the blacklist\n")
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "Token is expired",
+			})
+		}
+
+		// check if the ip is the same
+		claims, err := ParseJWTToken(cookie)
+		if err != nil {
+			fmt.Print("[!] Middleware JWT Auth: Error extratting jwt info\n")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Internal server error",
+			})
+		}
+		if claims.Ip != c.IP() {
+			fmt.Print("[!] Middleware JWT Auth: IP is different\n")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Token is invalid",
 			})
 		}
 
