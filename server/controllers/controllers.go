@@ -591,6 +591,213 @@ func GetPassword(c *fiber.Ctx) error {
 	})
 }
 
+func UpdatePassword(c *fiber.Ctx) error {
+	var passwordRequest models.PasswordUpdate
+	if err := c.BodyParser(&passwordRequest); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(passwordRequest) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required fields",
+		})
+	}
+
+	// get user id from jwt
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Update password: Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	// get password from db
+	result, err := clientPostgresDb.Password.FindMany(
+		db.Password.ID.Equals(passwordRequest.PasswordId),
+		db.Password.UserID.Equals(claims.Issuer),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Update password: Error occurred finding password: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding password",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] Update password: No password found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No password found",
+		})
+	}
+
+	// check if otp is needed
+	if result[0].OtpProtected {
+		fmt.Printf("[+] Update password: Password is protected by OTP\n")
+		otpSecret := clientRedisDb.Get(context.Background(), claims.Issuer).Val()
+		if otpSecret == "" {
+			fmt.Printf("[-] Update password: OTP: No secret found\n")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "OTP error",
+			})
+		}
+		
+		if !auth.VerifyOTP(otpSecret, passwordRequest.Otp) {
+			// event password update failed otp
+			err = event.NewEvent(clientPostgresDb, "Password update failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+			if err != nil {
+				fmt.Printf("[!] Update password: Error occurred creating event: %s", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"message": "Internal server error",
+				})
+			}
+
+			fmt.Printf("[-] Update password: OTP: Invalid code\n")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Invalid OTP",
+			})
+		}
+
+		fmt.Printf("[+] Update password: OTP: Access granted\n")
+	}
+
+	// check if the old password given is equal to the password in the db
+	if !cryptography.CompareStrings(passwordRequest.OldPassword, result[0].Password) {
+		fmt.Printf("[-] Update password: Password not match\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Password not match, old password is incorrect",
+		})
+	}
+
+	// event password update
+	err = event.NewEvent(clientPostgresDb, "Password updated", fmt.Sprintf("User updated a password for %s", result[0].Website), c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Update password: Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	// update password
+	_, err = clientPostgresDb.Password.FindMany(
+		db.Password.ID.Equals(passwordRequest.PasswordId),
+		db.Password.UserID.Equals(claims.Issuer),
+	).Update(
+		db.Password.Password.Set(passwordRequest.NewPassword),
+		db.Password.OtpProtected.Set(passwordRequest.OtpProtected),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Update password: Error occurred updating password: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error updating password",
+		})
+	}
+
+	fmt.Printf("[+] Update password: Password updated successfully\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Password updated successfully",
+	})
+}
+
+func DeletePassword(c *fiber.Ctx) error {
+	var passwordRequest models.PasswordDelete
+	if err := c.BodyParser(&passwordRequest); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(passwordRequest) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required fields",
+		})
+	}
+
+	// get user id from jwt
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Update password: Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	// get password from db
+	result, err := clientPostgresDb.Password.FindMany(
+		db.Password.ID.Equals(passwordRequest.PasswordId),
+		db.Password.UserID.Equals(claims.Issuer),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Delete password: Error occurred finding password: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding password",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] Delete password: No password found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No password found",
+		})
+	}
+
+	// check if otp is needed
+	if result[0].OtpProtected {
+		fmt.Printf("[+] Delete password: Password is protected by OTP\n")
+		otpSecret := clientRedisDb.Get(context.Background(), claims.Issuer).Val()
+		if otpSecret == "" {
+			fmt.Printf("[-] Delete password: OTP: No secret found\n")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "OTP error",
+			})
+		}
+		
+		if !auth.VerifyOTP(otpSecret, passwordRequest.Otp) {
+			// event password delete failed otp
+			err = event.NewEvent(clientPostgresDb, "Password delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+			if err != nil {
+				fmt.Printf("[!] Delete password: Error occurred creating event: %s", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"message": "Internal server error",
+				})
+			}
+
+			fmt.Printf("[-] Delete password: OTP: Invalid code\n")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Invalid OTP",
+			})
+		}
+
+		fmt.Printf("[+] Delete password: OTP: Access granted\n")
+	}
+
+	// event password delete
+	err = event.NewEvent(clientPostgresDb, "Password deleted", fmt.Sprintf("User deleted a password for %s", result[0].Website), c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Delete password: Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	// delete password
+	_, err = clientPostgresDb.Password.FindMany(
+		db.Password.ID.Equals(passwordRequest.PasswordId),
+		db.Password.UserID.Equals(claims.Issuer),
+	).Delete().Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Delete password: Error occurred deleting password: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error deleting password",
+		})
+	}
+
+	fmt.Printf("[+] Delete password: Password deleted successfully\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Password deleted successfully",
+	})
+}
+
 func Logout(c *fiber.Ctx) error {
 	// add the JWT token to redis blacklist
 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))

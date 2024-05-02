@@ -40,6 +40,19 @@ type PasswordRequestInfo struct {
     Otp             string `json:"otp"`
 }
 
+type PasswordDelete struct {
+    PasswordId      string `json:"passwordId"`
+    Otp             string `json:"otp"`
+}
+
+type PasswordUpdate struct {
+    PasswordId      string `json:"passwordId"`
+    OldPassword     string `json:"oldPassword"`
+    NewPassword     string `json:"newPassword"`
+    Otp             string `json:"otp"`
+    OtpProtected    bool   `json:"otpProtected"`
+}
+
 type PasswordLeakCheck struct {
     PasswordPartialHash        string `json:"password"`
 }
