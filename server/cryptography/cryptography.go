@@ -105,7 +105,6 @@ func ConvertBase64PublicKeyToPEM(base64Key string) (string, error) {
     return pemKey, nil
 }
 
-
 // Base64
 func Base64Encode(data []byte) string {
     return base64.StdEncoding.EncodeToString(data)

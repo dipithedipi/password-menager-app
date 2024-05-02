@@ -349,13 +349,11 @@ func Login(c *fiber.Ctx) error {
 
 	// delete old token(pass expire date) from postgres db for sessions
 	_, err = clientPostgresDb.Token.FindMany(
+		db.Token.UserID.Equals(retrivedUserDb[0].ID),
 		db.Token.ExpireAt.Before(time.Now()),
-		db.Token.User.Link(
-			db.User.ID.Equals(retrivedUserDb[0].ID),
-		),
 	).Delete().Exec(context.Background())
 	if err != nil {
-		fmt.Printf("[!] Session: Error occurred deleting old token, %s", err)
+		fmt.Printf("[!] Session: Error occurred deleting old tokens, %s\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Internal server error",
 		})
@@ -1015,9 +1013,7 @@ func GetSessions(c *fiber.Ctx) error {
 	}
 
 	result, err := clientPostgresDb.Token.FindMany(
-		db.Token.User.Link(
-			db.User.ID.Equals(claims.Issuer),
-		),
+		db.Token.UserID.Equals(claims.Issuer),
 	).Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Error occurred getting sessions: %s", err)
