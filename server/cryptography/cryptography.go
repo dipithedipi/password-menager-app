@@ -1,10 +1,7 @@
 package cryptography
 
 import (
-	"bytes"
 	"crypto"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/subtle"
@@ -108,113 +105,6 @@ func ConvertBase64PublicKeyToPEM(base64Key string) (string, error) {
     return pemKey, nil
 }
 
-// AES CBC (not working)
-func EncryptAESCBC(plaintext string, key []byte) ([]byte, error) {
-    block, err := aes.NewCipher(key)
-	if err != nil {
-		fmt.Println("key error1", err)
-        return nil, err
-	}
-
-	if plaintext == "" {
-		fmt.Println("plain content empty")
-        return nil, errors.New("plain content empty")
-	}
-
-    initialVector := key[:aes.BlockSize]
-	ecb := cipher.NewCBCEncrypter(block, []byte(initialVector))
-	content := []byte(string(plaintext))
-	content = PKCS5Padding(content, block.BlockSize())
-	ciphertext := make([]byte, len(content))
-	ecb.CryptBlocks(ciphertext, content)
-
-	return ciphertext, nil
-}
-
-func DecryptAESCBC(ciphertext []byte, key []byte) ([]byte, error) {
-    block, err := aes.NewCipher(key)
-	if err != nil {
-        return nil, err
-	}
-	if len(ciphertext) == 0 {
-        return nil, errors.New("plain content empty")
-	}
-
-    initialVector := key[:aes.BlockSize]
-	ecb := cipher.NewCBCDecrypter(block, []byte(initialVector))
-	decrypted := make([]byte, len(ciphertext))
-	ecb.CryptBlocks(decrypted, ciphertext)
-
-	return PKCS5Trimming(decrypted), nil
-}
-
-func PKCS5Padding(ciphertext []byte, blockSize int) []byte {
-	padding := blockSize - len(ciphertext)%blockSize
-	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(ciphertext, padtext...)
-}
-
-func PKCS5Trimming(encrypt []byte) []byte {
-	padding := encrypt[len(encrypt)-1]
-	return encrypt[:len(encrypt)-int(padding)]
-}
-
-// AES GCM
-func EncryptAESGCM(plaintext string, secretKey []byte) ([]byte, error)  {
-    fmt.Println("plaintext lenght: %v", len(plaintext))
-    fmt.Println("plaintext: %v", plaintext)
-    fmt.Println("key lenght: %v", len(secretKey))
-    fmt.Println("key: %v", secretKey)
-
-    aes, err := aes.NewCipher(secretKey)
-    if err != nil {
-        return nil, err
-    }
-
-    gcm, err := cipher.NewGCM(aes)
-    if err != nil {
-        return nil, err
-    }
-
-    // We need a 12-byte nonce for GCM (modifiable if you use cipher.NewGCMWithNonceSize())
-    // A nonce should always be randomly generated for every encryption.
-    nonce := make([]byte, gcm.NonceSize())
-    _, err = rand.Read(nonce)
-    if err != nil {
-        return nil, err
-    }
-
-    // ciphertext here is actually nonce+ciphertext
-    // So that when we decrypt, just knowing the nonce size
-    // is enough to separate it from the ciphertext.
-    ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
-
-    return ciphertext, nil
-}
-
-func DecryptAESGCM(ciphertext string, secretKey []byte) ([]byte, error) {
-    aes, err := aes.NewCipher(secretKey)
-    if err != nil {
-        return nil, err
-    }
-
-    gcm, err := cipher.NewGCM(aes)
-    if err != nil {
-        return nil, err
-    }
-
-    // Since we know the ciphertext is actually nonce+ciphertext
-    // And len(nonce) == NonceSize(). We can separate the two.
-    nonceSize := gcm.NonceSize()
-    nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-
-    plaintext, err := gcm.Open(nil, []byte(nonce), []byte(ciphertext), nil)
-    if err != nil {
-        return nil, err
-    }
-
-    return plaintext, nil
-}
 
 // Base64
 func Base64Encode(data []byte) string {
