@@ -347,6 +347,36 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
+	// delete old token(pass expire date) from postgres db for sessions
+	_, err = clientPostgresDb.Token.FindMany(
+		db.Token.ExpireAt.Before(time.Now()),
+		db.Token.User.Link(
+			db.User.ID.Equals(retrivedUserDb[0].ID),
+		),
+	).Delete().Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Session: Error occurred deleting old token, %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	// add token to postgres db for sessions online
+	_, err = clientPostgresDb.Token.CreateOne(
+		db.Token.TokenValue.Set(jwtToken),
+		db.Token.ExpireAt.Set(utils.CalculateExpireTime(os.Getenv("JWT_EXPIRES_IN"))),
+		db.Token.IPAddress.Set(c.IP()),
+		db.Token.User.Link(
+			db.User.ID.Equals(retrivedUserDb[0].ID),
+		),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Session: Error occurred adding token to db: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
 	// Event login success
 	err = event.NewEvent(clientPostgresDb, "Login success", "User logged in", c.IP(), retrivedUserDb[0].ID)
 	if err != nil {
@@ -357,6 +387,7 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	fmt.Printf("[+] Updated last login: \n")
+	fmt.Printf("[+] Session: new session\n")
 	c.Cookie(&cookie)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login successful",
@@ -686,6 +717,7 @@ func UpdatePassword(c *fiber.Ctx) error {
 	).Update(
 		db.Password.Password.Set(passwordRequest.NewPassword),
 		db.Password.OtpProtected.Set(passwordRequest.OtpProtected),
+		db.Password.Description.Set(passwordRequest.NewDescription),
 	).Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Update password: Error occurred updating password: %s", err)
@@ -833,6 +865,18 @@ func Logout(c *fiber.Ctx) error {
 			"message": "Internal server error",
 		})
 	}
+	fmt.Printf("[+] Token added to Redis blacklist\n")
+
+	// remove token from postgres db for sessions online
+	_, err = clientPostgresDb.Token.FindMany(
+		db.Token.TokenValue.Equals(cookie),
+	).Delete().Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Session: Error occurred removing token from db: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
 
 	// clear the cookie
 	cookieClear := fiber.Cookie{
@@ -844,6 +888,7 @@ func Logout(c *fiber.Ctx) error {
 	c.Cookie(&cookieClear)
 
 	fmt.Printf("[+] User %s logout\n", claims.Issuer)
+	fmt.Printf("[+] Session: Token removed from db\n")
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message":  "Logout successful",
 	})
@@ -895,5 +940,218 @@ func CheckPasswordLeak(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Password safe",
 		"result": false,
+	})
+}
+
+func GetEvents(c *fiber.Ctx) error {
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	var eventRequest models.EventRequest
+	if err := c.BodyParser(&eventRequest); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(eventRequest) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required fields",
+		})
+	}
+
+	// get events from db
+	startDateTime, err := time.Parse(time.RFC3339, eventRequest.StartDateTime)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid start date format",
+		})
+	}
+	endDateTime, err := time.Parse(time.RFC3339, eventRequest.EndDateTime)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid end date format",
+		})
+	}
+
+	result, err := clientPostgresDb.Event.FindMany(
+		db.Event.UserID.Equals(claims.Issuer),
+		db.Event.CreatedAt.After(startDateTime),
+		db.Event.CreatedAt.Before(endDateTime),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Error occurred getting events: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] No events found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No events found",
+		})
+	}
+
+	fmt.Printf("[+] Events found\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Events found",
+		"events":  result,
+	})
+}
+
+func GetSessions(c *fiber.Ctx) error {
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	result, err := clientPostgresDb.Token.FindMany(
+		db.Token.User.Link(
+			db.User.ID.Equals(claims.Issuer),
+		),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Error occurred getting sessions: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+	
+	if len(result) == 0 {
+		fmt.Printf("[-] No sessions found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No sessions found",
+		})
+	}
+
+	// search for the current user's sessions
+	userSessions := []models.SessionModelResponse{}
+	for index, session := range result {
+		userSessions = append(userSessions, models.SessionModelResponse{
+			DatabaseElemID: session.ID,
+			LastUse:   	session.UpdatedAt.Format(time.RFC3339),
+			IpAddress:  session.IPAddress,
+			CreatedAt: 	session.CreatedAt.Format(time.RFC3339),
+			CurrentUser: false,
+		})
+		if session.TokenValue == cookie {
+			userSessions[index].CurrentUser = true
+		}
+	}
+
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Sessions found",
+		"sessions": userSessions,
+	})
+}
+
+func ForceLogoutSession(c *fiber.Ctx) error {
+	var sessionDeleteRequest models.SessionDeleteRequest
+	if err := c.BodyParser(&sessionDeleteRequest); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(sessionDeleteRequest) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required fields",
+		})
+	}
+		
+	// get user id from jwt
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Force remove session: Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	// otp
+	otpSecret := clientRedisDb.Get(context.Background(), claims.Issuer).Val()
+	if otpSecret == "" {
+		fmt.Printf("[-] Force remove session: OTP: No secret found\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "OTP error",
+		})
+	}
+
+	if !auth.VerifyOTP(otpSecret, sessionDeleteRequest.Otp) {
+		// event session delete failed otp
+		err = event.NewEvent(clientPostgresDb, "Session delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+		if err != nil {
+			fmt.Printf("[!] Force remove session: Error occurred creating event: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Internal server error",
+			})
+		}
+
+		fmt.Printf("[-] Force remove session: OTP: Invalid code\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Invalid OTP",
+		})
+	}
+
+	// event session delete
+	err = event.NewEvent(clientPostgresDb, "Session deleted", "User deleted a session", c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Force remove session: Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	// remove session from postgres db
+	// get
+	result, err := clientPostgresDb.Token.FindMany(
+		db.Token.ID.Equals(sessionDeleteRequest.DatabaseElemID),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Force remove session: Error occurred finding session: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding session",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] Force remove session: No session found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No session found",
+		})
+	}
+
+	// delete 
+	_, err = clientPostgresDb.Token.FindMany(
+		db.Token.ID.Equals(sessionDeleteRequest.DatabaseElemID),
+	).Delete().Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Force remove session: Error occurred deleting session: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error deleting session",
+		})
+	}
+
+	// remove session from redis db
+	_, err = clientRedisDb.Del(context.Background(), result[0].TokenValue).Result()
+	if err != nil {
+		fmt.Printf("[!] Force remove session: Error occurred deleting session from Redis: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	fmt.Printf("[+] Force remove session: Session removed successfully\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Session Removed successfully",
 	})
 }

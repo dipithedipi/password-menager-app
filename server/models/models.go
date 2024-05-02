@@ -1,7 +1,7 @@
 package models
 
 import (
-    "github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt"
 )
 
 type UserRegister struct {
@@ -49,6 +49,7 @@ type PasswordUpdate struct {
     PasswordId      string `json:"passwordId"`
     OldPassword     string `json:"oldPassword"`
     NewPassword     string `json:"newPassword"`
+    NewDescription  string `json:"description"`
     Otp             string `json:"otp"`
     OtpProtected    bool   `json:"otpProtected"`
 }
@@ -57,12 +58,30 @@ type PasswordLeakCheck struct {
     PasswordPartialHash        string `json:"password"`
 }
 
+type EventRequest struct {
+    StartDateTime   string `json:"start"`
+    EndDateTime     string `json:"end"`
+}
+
 type ArgonParams struct {
     Memory          uint32
     Iterations      uint32
     Parallelism     uint8
     SaltLength      uint32
     KeyLength       uint32
+}
+
+type SessionModelResponse struct {
+    DatabaseElemID string
+    IpAddress   string
+    CreatedAt   string
+    LastUse     string
+    CurrentUser bool
+}
+
+type SessionDeleteRequest struct {
+    DatabaseElemID string `json:"id"`
+    Otp           string  `json:"otp"`
 }
 
 type CustomJWTClaims struct {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/dipithedipi/password-manager/utils"
 	"github.com/dipithedipi/password-manager/models"
+	"github.com/dipithedipi/password-manager/prisma/db"
 	"github.com/golang-jwt/jwt"
 	"github.com/xlzd/gotp"
 )
@@ -86,7 +87,7 @@ func TokenRemainingTime(claims *models.CustomJWTClaims) int64 {
 	return claims.ExpiresAt - time.Now().Unix()
 }
 
-func MiddlewareJWTAuth(clientRedisDb *redis.Client) fiber.Handler {
+func MiddlewareJWTAuth(clientRedisDb *redis.Client, clientPostgresDb *db.PrismaClient) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		fmt.Print("[+] Middleware JWT Auth\n")	
 
@@ -116,11 +117,41 @@ func MiddlewareJWTAuth(clientRedisDb *redis.Client) fiber.Handler {
 			})
 		}
 
+		// check if the ip is the same
+		claims, err := ParseJWTToken(cookie)
+		if err != nil {
+			fmt.Print("[!] Middleware JWT Auth: Error extratting jwt info\n")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Internal server error",
+			})
+		}
+		if claims.Ip != c.IP() {
+			fmt.Print("[!] Middleware JWT Auth: IP is different\n")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Token is invalid",
+			})
+		}
+
 		// check if the token is in the blacklist
 		result, err := clientRedisDb.Get(context.Background(), cookie).Result()
 		if err == redis.Nil {
 			// token not found in the blacklist, continue
 			fmt.Print("[+] Middleware JWT Auth: sucess\n")
+
+			// update session token last use
+			_, err := clientPostgresDb.Token.FindMany(
+				db.Token.TokenValue.Contains(cookie),
+			).Update(
+				db.Token.UpdatedAt.Set(time.Now()),
+			).Exec(context.Background())
+			if err != nil {
+				fmt.Printf("[!] Session: Error updating token last use: %v\n", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"message": "Internal server error",
+				})
+			}
+
+			fmt.Print("[+] Session: token last use time updated\n")
 			return c.Next()
 		} else if err != nil {
 			fmt.Printf("[!] Error check redis blacklist: %v\n", err)
@@ -134,21 +165,6 @@ func MiddlewareJWTAuth(clientRedisDb *redis.Client) fiber.Handler {
 			fmt.Print("[!] Middleware JWT Auth: token found in the blacklist\n")
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "Token is expired",
-			})
-		}
-
-		// check if the ip is the same
-		claims, err := ParseJWTToken(cookie)
-		if err != nil {
-			fmt.Print("[!] Middleware JWT Auth: Error extratting jwt info\n")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Internal server error",
-			})
-		}
-		if claims.Ip != c.IP() {
-			fmt.Print("[!] Middleware JWT Auth: IP is different\n")
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "Token is invalid",
 			})
 		}
 

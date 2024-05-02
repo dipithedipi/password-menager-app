@@ -158,12 +158,19 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     apiUser.Get("/login/salt", controllers.GetSaltFromUser)
     apiUser.Post("/logout", controllers.Logout)
 
-    apiPassword := app.Group("/password", auth.MiddlewareJWTAuth(clientRedisDb))
+    apiPassword := app.Group("/password", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb))
     apiPassword.Post("/new", controllers.PostNewPassword)
     apiPassword.Get("/search", controllers.GetPasswordPreview)
     apiPassword.Get("/get", controllers.GetPassword)
     apiPassword.Put("/update", controllers.UpdatePassword)
     apiPassword.Delete("/delete", controllers.DeletePassword)
+
+    apiSession := app.Group("/session", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb))
+    apiSession.Get("/gets", controllers.GetSessions)
+    apiSession.Delete("/delete", controllers.ForceLogoutSession)
+
+    apiEvent := app.Group("/event", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb))
+    apiEvent.Get("/gets", controllers.GetEvents)
 
     apiUtils := app.Group("/utils")
     apiUtils.Get("/checkPassword", controllers.CheckPasswordLeak)

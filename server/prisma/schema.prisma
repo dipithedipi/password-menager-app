@@ -50,12 +50,12 @@ model Password {
 
 // This block defines a "Token" model. This model is also related to the "User" model through a relation.
 model Token {
-  id         String       @id @unique @default(uuid()) // Unique identifier for the token, auto-incremented
+  id         String    @id @unique @default(uuid()) // Unique identifier for the token, auto-incremented
   createdAt  DateTime  @default(now()) // Creation time, default is the current time
-  updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
+  updatedAt  DateTime  @updatedAt // Last update use, automatically set to the current time on update
   tokenValue String    @unique // Unique email token
-  valid      Boolean   @default(true) // Validity status, default is true
-  type       TokenType // Token type, enum value
+  expireAt   DateTime  // Token expiration time
+  type       TokenType @default(WEB)// Token type, enum value
   ipAddress  String // last login IP address
 
   userId     String    // Foreign key to the User model
