@@ -14,10 +14,10 @@
 </script>
 
 <!-- <DarkMode /> -->
-<div class="container mx-auto py-2">
+<div class="container mx-auto py-2 overflow-hidden">
 	<Navbar></Navbar>
 	{#if !contentPage}
-		<div class="flex pt-2 h-full space-x-2">
+		<div class="flex pt-2 space-x-2 h-full">
 			<Sidebar></Sidebar>
 			<slot></slot>
 	  </div>
