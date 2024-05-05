@@ -1,31 +1,28 @@
 <script>
-    import { Navbar, NavBrand, NavLi, NavUl, NavHamburger, Avatar, Dropdown, DropdownItem, DropdownHeader, DropdownDivider } from 'flowbite-svelte';
-  </script>
-  
-<Navbar rounded color="form">
-    <NavBrand href="/">
-      <img src="/logo.jpg" class="me-3 h-8 sm:h-9 rounded-full" alt="Flowbite Logo" />
-      <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">PassGuard</span>
-    </NavBrand>
-    <div class="flex items-center md:order-2">
-      <Avatar id="avatar-menu" class="ri-account-circle-line" />
-      <NavHamburger class1="w-full md:flex md:w-auto md:order-1" />
-    </div>
-    <Dropdown placement="bottom" triggeredBy="#avatar-menu">
-      <DropdownHeader>
-        <span class="block text-sm">USERNAME</span>
-        <span class="block truncate text-sm font-medium">EMAIL</span>
-      </DropdownHeader>
-      <DropdownItem>Settings</DropdownItem>
-      <DropdownDivider />
-      <DropdownItem>Sign out</DropdownItem>
-    </Dropdown>
-    
-      <!-- <NavUl>
-        <NavLi href="/">Password</NavLi>
-        <NavLi href="/about">Events</NavLi>
-        <NavLi href="/docs/components/navbar">Devices</NavLi>
-        <NavLi href="/pricing">Password Health</NavLi>
-        <NavLi href="/contact">Password Generator</NavLi>
-      </NavUl> -->
-</Navbar>
+    import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
+
+    // @ts-ignore
+    function handleGetStartedClick(event) {
+        event.preventDefault();
+        goto('/login');
+    }
+   
+    $: classAttr = "flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse " + ($page.url.pathname === "/" ? "" : "hidden");
+</script>
+
+<div class="fixed h-16 w-screen">
+    <nav class="bg-white border-gray-200 dark:bg-gray-800">
+        <div class="flex flex-wrap items-center justify-between mx-auto p-4">
+        <a href="/" class="flex items-center space-x-3 rtl:space-x-reverse">
+            <img src="/logo.jpg" class="h-9 rounded-full" alt="Logo" />
+            <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">PassGuard</span>
+        </a>
+        <div class={classAttr}>
+            <button type="button" on:click={handleGetStartedClick} class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+            Get started
+            </button>
+        </div>
+        </div>
+    </nav>
+</div>

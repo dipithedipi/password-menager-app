@@ -38,6 +38,8 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"remixicon": "^4.2.0"
+		"@popperjs/core": "^2.11.8",
+		"remixicon": "^4.2.0",
+		"tailwind-merge": "^2.3.0"
 	}
 }

@@ -2,26 +2,25 @@
 	import '../app.pcss';
  	import { DarkMode } from 'flowbite-svelte';
 	import { page } from '$app/stores';
-	import Navbar from '$lib/components/Navbar.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import Navbar from '$lib/components/Navbar.svelte';
 
-	// check if the route is different from /login or /register
-	let currentUrl = $page.url.pathname;
-	let contentPage = true
-	if (currentUrl !== '/login' && currentUrl !== '/register') {
-		contentPage = false 
-	}
+	// Aggiorna lo stato della navbar in modo reattivo
+	$: navbarVisible = $page.url.pathname !== '/login' && $page.url.pathname !== '/register' && $page.url.pathname !== '/';
 </script>
 
 <!-- <DarkMode /> -->
-<div class="container mx-auto py-2 overflow-hidden">
-	<Navbar></Navbar>
-	{#if !contentPage}
-		<div class="flex pt-2 space-x-2 h-full">
-			<Sidebar></Sidebar>
-			<slot></slot>
-	  </div>
-	{:else}
-		<slot></slot>
-	{/if}
+<div class="bg-slate-600">
+	<div>
+		{#if navbarVisible}
+			<div>
+				<Sidebar><slot></slot></Sidebar>
+			</div>
+		{:else}
+			<div class="h-full">
+				<Navbar/>
+				<slot></slot>
+			</div>
+		{/if}
+	</div>
 </div>
