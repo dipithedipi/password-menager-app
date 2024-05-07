@@ -1,6 +1,6 @@
 <div class="h-screen bg-gray-900">
-    <section class="bg-white pt-6 sm:pt-0 dark:bg-gray-900 flex flex-col justify-center items-center">
-        <div class="max-w-screen-xl px-4 py-4 mx-auto text-center lg:pt-12 lg:px-6">
+    <section class="pt-6 dark:bg-gray-900 flex flex-col justify-center items-center">
+        <div class="max-w-screen-xl px-4 py-4 mx-auto text-center lg:px-6">
             <dl class="grid max-w-screen-md gap-7 mx-auto text-gray-900 sm:grid-cols-3 dark:text-white">
                 <div class="flex flex-col items-center justify-center p-2 border-2 border-dashed border-slate-500 rounded-md">
                     <dt class="mb-2 text-3xl md:text-4xl font-extrabold">73</dt>
@@ -16,9 +16,9 @@
                 </div>
 
                 <div class="pl-2 flex items-center justify-center col-span-3">
-                    <button type="button" class="text-blue-700 hover:text-white border border-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2 dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:hover:bg-blue-500 dark:focus:ring-blue-800 w-full">
+                    <a href="#" class="px-3 py-2 mb-3 w-full mr-2 sm:mr:1 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
                         Check all passwords now
-                    </button>
+                    </a>
                 </div>
             </dl>
         </div>
