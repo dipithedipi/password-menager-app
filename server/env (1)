@@ -1,0 +1,51 @@
+# -----------------------------------------------------------------------------
+# API server cryptography keys
+# -----------------------------------------------------------------------------
+PUBLIC_KEY_PATH=./cryptography/keys/public.pem
+PRIVATE_KEY_PATH=./cryptography/keys/private.pem # This should be removed and stored in a secure location
+RSA_KEY_LENGTH=2048
+OTP_SECRET_LENGTH=32
+
+# -----------------------------------------------------------------------------
+# PostgreSQL Credentials for Docker Compose
+# -----------------------------------------------------------------------------
+POSTGRES_HOST=127.0.0.1
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=password123
+POSTGRES_DB=password_menager_app
+POSTGRES_PORT=6500
+
+# -----------------------------------------------------------------------------
+# Database Schema (PostgreSQL - Docker - Prisma)
+# -----------------------------------------------------------------------------
+DATABASE_URL=postgresql://admin:password123@localhost:6500/password_menager_app?schema=public
+
+# -----------------------------------------------------------------------------
+# pgAdmin4 Credentials for Docker Compose
+# -----------------------------------------------------------------------------
+PGADMIN_DEFAULT_EMAIL=admin@admin.com
+PGADMIN_DEFAULT_PASSWORD=password123
+PGADMIN_LISTEN_PORT=80
+
+# -----------------------------------------------------------------------------
+# Redis
+# -----------------------------------------------------------------------------
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=password123
+REDIS_DB=0
+
+# -----------------------------------------------------------------------------
+# JSON Web Token Credentials
+# https://www.javainuse.com/jwtgenerator
+# key = dipi_the_dipi
+# -----------------------------------------------------------------------------
+JWT_SECRET_KEY=eyJhbGciOiJIUzUxMiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImV4cCI6MTcwNDIxMjUyMywiaWF0IjoxNzA0MjEyNTIzfQ.x9C98DlRnPEEr5CFwljMltoK_yW98a9Ym99t7iKtbRWHYk7d5EjYwMqHMMeuTV3H8exhZG6hlUEWxIhpYE70zw
+JWT_EXPIRES_IN=15 # minutes
+JWT_COOKIE_TOKEN_NAME=jwtToken
+
+
+# -----------------------------------------------------------------------------
+# K-anonimity
+# -----------------------------------------------------------------------------
+K_ANONYMITY_DEFAULT_WORDLIST_LINK=https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt

@@ -2,7 +2,7 @@
 	import EventLine from '$lib/components/EventLine.svelte';
 </script>
 
-<div class="h-full pt-3 bg-gray-700">
+<div class="pt-3 pb-3 sm:h-full md:h-screen bg-gray-700">
 	<div date-rangepicker class="flex items-center justify-center pt-6">
 		<div class="ml-4 sm:ml-0 relative">
 			<div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
@@ -43,12 +43,12 @@
 			<input
 				name="end"
 				type="text"
-				class="block w-full rounded-lg border-2 border-gray-300 bg-gray-50 p-2.5 ps-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+				class="block w-full rounded-lg border-2 border-gray-300 bg-gray-50 p-2.5 ps-10 text-sm text-gray-900 focus:border-gray-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400 dark:focus:border-gray-500 dark:focus:ring-blue-500"
 				placeholder="Select date end"
 			/>
 		</div>
 	</div>
-    <div class="w-3/4 flex flex-col items-center justify-center pt-4 mx-auto">
-        <EventLine/>
-    </div>
+	<div class="w-3/4 flex flex-col items-center justify-center pt-4 mx-auto">
+		<EventLine/>
+	</div>
 </div>
