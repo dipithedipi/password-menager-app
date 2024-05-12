@@ -7,6 +7,7 @@ import (
 	"github.com/dipithedipi/password-manager/cryptography"
 	"github.com/dipithedipi/password-manager/routes"
 	"github.com/gofiber/fiber/v2"
+    "github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 )
 
@@ -56,6 +57,12 @@ func main() {
 
     // Create a new Fiber app
     app := fiber.New()
+
+    // Setup cors
+    app.Use(cors.New(cors.Config{
+        AllowOrigins: "*",
+    }))
+
     routes.Setup(app, clientPostgresDb, clientRedisDb)
     app.Listen(":8000")
 }

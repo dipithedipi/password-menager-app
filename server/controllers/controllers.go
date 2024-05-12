@@ -25,8 +25,8 @@ var p = &models.ArgonParams{
 	Memory:      64 * 1024,
 	Iterations:  3,
 	Parallelism: 2,
-	SaltLength:  16,
-	KeyLength:   32,
+	SaltLength:  32,
+	KeyLength:   64,
 }
 
 func SetPostgresDbClient(client *db.PrismaClient) {
@@ -163,7 +163,7 @@ func Register(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message":      "User created successfully",
 		"otpSecretUri": encOtpSecreturi,
-		//"otpSecretUriUnencrypted": otpSecretUri,
+		// "otpSecretUriUnencrypted": otpSecretUri,
 		// "otpSecretUriDecrypted": string(z),
 	})
 }
@@ -171,7 +171,9 @@ func Register(c *fiber.Ctx) error {
 func GetSaltFromUser(c *fiber.Ctx) error {
 	var user models.UserSaltLogin
 
+	// read from url params
 	if err := c.BodyParser(&user); err != nil {
+		fmt.Printf("error: %v\n", err)
 		return fiber.ErrBadRequest
 	}
 

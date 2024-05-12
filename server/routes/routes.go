@@ -155,7 +155,7 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     apiUser.Post("/register", controllers.Register)
     apiUser.Get("/register/salt", controllers.RandomSalt)
     apiUser.Post("/login", controllers.Login)
-    apiUser.Get("/login/salt", controllers.GetSaltFromUser)
+    apiUser.Post("/login/salt", controllers.GetSaltFromUser)
     apiUser.Post("/logout", controllers.Logout)
 
     apiPassword := app.Group("/password", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb))
