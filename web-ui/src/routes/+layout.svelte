@@ -5,7 +5,6 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 
-	// Aggiorna lo stato della navbar in modo reattivo
 	$: navbarVisible = $page.url.pathname !== '/login' && $page.url.pathname !== '/register' && $page.url.pathname !== '/';
 </script>
 

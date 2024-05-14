@@ -9,7 +9,11 @@ type UserRegister struct {
     Email           string `json:"email"`
     PasswordHash    string `json:"password"`
     Salt            string `json:"salt"`
-    PublicKey       string `json:"public_key"`
+    PublicKey       string `json:"publicKey"`
+}
+
+type UserRegisterUsernameCheck struct {
+    Username        string `json:"username"`
 }
 
 type UserLogin struct {

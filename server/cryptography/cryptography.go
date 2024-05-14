@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/x509"
 	"encoding/base64"
@@ -18,7 +19,9 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// RSA
+// RSA OEAP
+// private key: PKCS1
+// public key: SubjectPublicKeyInfo structure (PKIX)
 func GenerateKeysRSA(publicKeyPath string, privateKeyPath string, keyLenght int) {
     privateKey, err := rsa.GenerateKey(rand.Reader, keyLenght)
     if err != nil {
@@ -68,7 +71,7 @@ func EncryptDataRSA(plaintext []byte, publicKeyPEM []byte) ([]byte, error) {
         return nil, err
 	}
 
-	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, publicKey.(*rsa.PublicKey), plaintext)
+	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKey.(*rsa.PublicKey), plaintext, nil)
 	if err != nil {
         return nil, err
 	}
@@ -83,7 +86,7 @@ func DecryptDataRSA(ciphertext []byte, privateKeyPEM []byte) []byte {
         panic(err)
     }
 
-    plaintext, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, ciphertext)
+    plaintext, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, ciphertext, nil)
     if err != nil {
         panic(err)
     }

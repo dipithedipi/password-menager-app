@@ -1,7 +1,7 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { getSalt, login } from '$lib/logic/login';
     import { checkMail } from '$lib/logic/utils';
-    import { goto } from '$app/navigation';
 
     let loginStep: number = 1;
     
@@ -19,6 +19,13 @@
     let email: string = '';
     let errorMail: boolean = false;
     let errorMailText: string = '';
+    let emailRemember: boolean = false;
+    if (typeof window!== 'undefined') {
+        if (localStorage.getItem('emailRemember') == 'true') {
+            email = localStorage.getItem('email') || '';
+            emailRemember = true;
+        }
+    }
 
     // password
     let password: string = '';
@@ -37,11 +44,19 @@
                 return;
             }
 
-
             if (password == '') {
                 errorPass = true;
                 return;
             }
+        }
+
+        // remember email
+        if (emailRemember) {
+            localStorage.setItem('email', email);
+            localStorage.setItem('emailRemember', 'true');
+        } else {
+            localStorage.removeItem('email');
+            localStorage.removeItem('emailRemember');
         }
 
         salt = await getSalt(email);
@@ -87,13 +102,6 @@
         }
         
         console.log('Login success');
-        
-        //generate the rsa key
-        // save the rsa key in the local storage
-        
-
-        // redirect to /passwords
-        goto('/passwords');
     }
 </script>
 
@@ -123,7 +131,7 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-start">
                                 <div class="flex items-center h-5">
-                                <input id="remember" aria-describedby="remember" type="checkbox" class="w-4 h-4 border border-gray-300 rounded bg-gray-50 focus:ring-3 focus:ring-primary-300 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-600 dark:ring-offset-gray-800">
+                                <input bind:value={emailRemember} bind:checked={emailRemember} id="remember" aria-describedby="remember" type="checkbox" class="w-4 h-4 border border-gray-300 rounded bg-gray-50 focus:ring-3 focus:ring-primary-300 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-600 dark:ring-offset-gray-800">
                                 </div>
                                 <div class="ml-3 text-sm">
                                 <label for="remember" class="text-gray-500 dark:text-gray-300">Remember me</label>

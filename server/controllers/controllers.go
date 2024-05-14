@@ -38,6 +38,50 @@ func SetRedisDbClient(client *redis.Client) {
 }
 
 // ------------------- api controllers -------------------
+func CheckUsername(c *fiber.Ctx) error {
+	var username models.UserRegisterUsernameCheck
+
+	if err := c.BodyParser(&username); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(username) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
+
+	retrivedUserDb, err := clientPostgresDb.User.FindMany(
+		db.User.Username.Equals(username.Username),
+	).Exec(context.Background())
+	if errors.Is(err, db.ErrNotFound) {
+		fmt.Printf("[-] Register: No record with username: %s\n", username.Username)
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message": "Username available",
+			"available": true,
+		})
+	} else if err != nil {
+		fmt.Printf("[!] Register: Error occurred finding username in database: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	if len(retrivedUserDb) > 0 {
+		fmt.Printf("[-] Register: Username already exists: %s\n", username.Username)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Username already exists",
+			"available": false,
+		})
+	} else {
+		fmt.Printf("[+] Register: Username available: %s\n", username.Username)
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message": "Username available",
+			"available": true,
+		})
+	}
+}
+
 
 func Register(c *fiber.Ctx) error {
 	var user models.UserRegister
@@ -333,7 +377,10 @@ func Login(c *fiber.Ctx) error {
 		Name:     os.Getenv("JWT_COOKIE_TOKEN_NAME"),
 		Value:    jwtToken,
 		Expires:  utils.CalculateExpireTime(os.Getenv("JWT_EXPIRES_IN")),
-		HTTPOnly: true,
+		HTTPOnly: false, // this will be set from the frontend
+		Domain:  "127.0.0.1",
+		Path:    "/",
+		SameSite: "None",
 	}
 
 	_, err = clientPostgresDb.User.FindMany(

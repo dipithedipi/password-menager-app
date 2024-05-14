@@ -1,10 +1,23 @@
 import { Argon2, Argon2Mode } from '@sphereon/isomorphic-argon2';
 import * as CryptoJS from 'crypto-js';
-import rsa from 'js-crypto-rsa';
+
 
 // base64
 function base64Encode(input: string): string {
     return btoa(input);
+}
+
+function base64Decode(input: string): string {
+    return atob(input);
+}
+
+function base64DecodeBytes(input: string): Uint8Array {
+    const str = atob(input);
+    const bytes = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) {
+        bytes[i] = str.charCodeAt(i);
+    }
+    return bytes;
 }
 
 // argon2id
@@ -22,31 +35,6 @@ async function hashPasswordArgon2id(password: string, salt: string): Promise<str
     return hash.hex;
 }
 
-// RSA
-async function generateRSAKeyPair(): Promise<{publicKeyRSA: JsonWebKey, privateKeyRSA: JsonWebKey}>{
-    const keys = await rsa.generateKey(2048)
-    return {publicKeyRSA:keys.publicKey, privateKeyRSA:keys.privateKey};
-}
-
-async function encryptRSA(text: string, publicKey: JsonWebKey): Promise<Uint8Array> {
-    const textBytes = new TextEncoder().encode(text);
-    const encrypted = await rsa.encrypt(
-        textBytes,
-        publicKey,
-        'SHA-256', 
-    )
-    return encrypted;
-}
-
-async function decryptRSA(encrypted: Uint8Array, privateKey: JsonWebKey): Promise<string> {
-    const decrypted = await rsa.decrypt(
-        encrypted,
-        privateKey,
-        'SHA-256',
-    )
-    return new TextDecoder().decode(decrypted);
-}
-
 // AES
 function encryptAES(text: string, passphrase: string): string {
   return CryptoJS.AES.encrypt(text, passphrase).toString();
@@ -58,4 +46,4 @@ function decryptAES(ciphertext: string , passphrase: string): string {
   return originalText;
 }
 
-export { hashPasswordArgon2id, encryptAES, decryptAES, encryptRSA, decryptRSA, generateRSAKeyPair, base64Encode};
+export { hashPasswordArgon2id, encryptAES, decryptAES, base64Encode, base64Decode, base64DecodeBytes};

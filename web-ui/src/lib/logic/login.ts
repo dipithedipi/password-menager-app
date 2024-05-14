@@ -1,4 +1,5 @@
-import {hashPasswordArgon2id, encryptAES, decryptAES, generateRSAKeyPair, encryptRSA, decryptRSA } from './cryptography';
+import {hashPasswordArgon2id, encryptAES, decryptAES } from './cryptography';
+import { setCookie, getCookie } from './utils';
 
 async function getSalt(email: string): (Promise<string|boolean>) {
     try {
@@ -29,8 +30,10 @@ async function login(email: string, password: string, salt: string, otpCode: str
     try {
         const response = await fetch('http://127.0.0.1:8000/user/login', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
+                'Access-Control-Allow-Credentials': 'true',
             },
             body: JSON.stringify({ email, password: hashedPassword, otp:otpCode }),
         });
@@ -46,17 +49,6 @@ async function login(email: string, password: string, salt: string, otpCode: str
 
         // const decrypted = decryptAES(encrypted, "password");
         // console.log('decrypted:', decrypted);
-
-        // test RSA
-        // let {publicKeyRSA, privateKeyRSA} = await generateRSAKeyPair();
-        // console.log('publicKeyRSA:', publicKeyRSA);
-        // console.log('privateKeyRSA:', privateKeyRSA);
-
-        // const encryptedRSA = await encryptRSA("Hello, World!", publicKeyRSA);
-        // console.log('encryptedRSA:', encryptedRSA);
-
-        // const decryptedRSA = await decryptRSA(encryptedRSA, privateKeyRSA);
-        // console.log('decryptedRSA:', decryptedRSA);
 
         return { success: true, message: message };
     } catch (error) {

@@ -1,5 +1,20 @@
-<script>
+<script lang="ts">
 	import MyModalSettings from '$lib/components/MyModalSettings.svelte'
+
+	function handleRedirectEvents(event:any) {
+		event.preventDefault()
+		window.location.href = "/events"
+	}
+
+	function handleRedirectDevices(event:any) {
+		event.preventDefault()
+		window.location.href = "/devices"
+	}
+
+	function handleRedirectPasswords(event:any) {
+		event.preventDefault()
+		window.location.href = "/passwords"
+	}
 </script>
 
 <MyModalSettings modalId="settings"></MyModalSettings>
@@ -58,7 +73,8 @@
 			<ul class="space-y-2 font-medium">
 				<li>
 					<a
-						href="/passwords"
+						href="#"
+						on:click={handleRedirectPasswords}
 						class="group flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
 					>
 						<svg
@@ -75,7 +91,8 @@
 				</li>
 				<li>
 					<a
-						href="/devices"
+						href="#"
+						on:click={handleRedirectDevices}
 						class="group flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
 					>
 						<svg
@@ -96,7 +113,8 @@
 				</li>
 				<li>
 					<a
-						href="/events"
+						href="#"
+						on:click={handleRedirectEvents}
 						class="group flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
 					>
 						<svg

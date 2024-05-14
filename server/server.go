@@ -60,7 +60,8 @@ func main() {
 
     // Setup cors
     app.Use(cors.New(cors.Config{
-        AllowOrigins: "*",
+        AllowOrigins: "http://localhost:5173",
+        AllowCredentials: true,
     }))
 
     routes.Setup(app, clientPostgresDb, clientRedisDb)

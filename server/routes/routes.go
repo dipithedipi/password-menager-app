@@ -154,6 +154,7 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     apiUser := app.Group("/user")
     apiUser.Post("/register", controllers.Register)
     apiUser.Get("/register/salt", controllers.RandomSalt)
+    apiUser.Post("/register/username", controllers.CheckUsername)
     apiUser.Post("/login", controllers.Login)
     apiUser.Post("/login/salt", controllers.GetSaltFromUser)
     apiUser.Post("/logout", controllers.Logout)
