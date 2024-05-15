@@ -1,6 +1,6 @@
-<script>
+<script lang="ts">
 	import { checkMail, generateQRCode } from '$lib/logic/utils';
-    import { checkUsername, register } from '$lib/logic/register';
+    import { checkUsername, register, verifyAccount } from '$lib/logic/register';
 
     let username = '';
     let errorUsername = false;
@@ -19,6 +19,19 @@
     let errorTerms = false;
 
     let otpUrlQrCodeImage = ""
+
+    let code1: string = '';
+    let code2: string = '';
+    let code3: string = '';
+    let code4: string = '';
+    let code5: string = '';
+    let code6: string = '';
+    let errorOtp: boolean = false;
+    let errorOtpText: string = '';
+
+    function getOtpCode() {
+        return code1 + code2 + code3 + code4 + code5 + code6;
+    }
 
     let registerStep = 0;
     async function nextStep() {
@@ -76,6 +89,18 @@
             registerStep++;
         } else if (registerStep === 3) {
             // otp code test
+            let otpCode = getOtpCode();
+            let {success, message} = await verifyAccount(email, otpCode);
+            if (!success) {
+                errorOtp = true;
+                errorOtpText = message;
+                return;
+            }
+            console.log("Account verified");
+            // redirect to login after 1 seconds
+            setTimeout(() => {
+                window.location.href = "/login";
+            }, 1000);
         }
     }
 </script>
@@ -149,14 +174,38 @@
                                 </div>
                             </div>
                         {:else if registerStep === 3}
-                            <div>
+                        <div class="max-w-sm mx-auto">
+                            <div class="flex mb-2 space-x-2 rtl:space-x-reverse mx-auto">
                                 <div>
-                                    <label for="email" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Otp test code</label>
-                                    <input type="email" name="email" id="email" class="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="name@company.com">
-                                </div>                            
-                                <div class="space-y-3 pt-3">
-                                    <button class="w-full text-white bg-primary-600 hover:bg-primary-700 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Create an account</button>
+                                    <label for="code-1" class="sr-only">First code</label>
+                                    <input bind:value={code1} type="text" maxlength="1" data-focus-input-init data-focus-input-next="code-2" id="code-1" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
                                 </div>
+                                <div>
+                                    <label for="code-2" class="sr-only">Second code</label>
+                                    <input bind:value={code2} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-1" data-focus-input-next="code-3" id="code-2" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
+                                </div>
+                                <div>
+                                    <label for="code-3" class="sr-only">Third code</label>
+                                    <input bind:value={code3} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-2" data-focus-input-next="code-4" id="code-3" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
+                                </div>
+                                <div>
+                                    <label for="code-4" class="sr-only">Fourth code</label>
+                                    <input bind:value={code4} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-3" data-focus-input-next="code-5" id="code-4" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
+                                </div>
+                                <div>
+                                    <label for="code-5" class="sr-only">Fifth code</label>
+                                    <input bind:value={code5} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-4" data-focus-input-next="code-6" id="code-5" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
+                                </div>
+                                <div>
+                                    <label for="code-6" class="sr-only">Sixth code</label>
+                                    <input bind:value={code6} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-5" id="code-6" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
+                                </div>
+                            </div>
+                                <p id="helper-text-explanation" class="mt-2 mb-4 text-sm text-gray-500 dark:text-gray-400">Please introduce the 6 digit code from Autenticator App.</p>
+                            {#if errorOtp}
+                                <p class="text-sm mb-2 text-red-600 dark:text-red-500">{errorOtpText}</p>
+                            {/if}
+                            <button on:click={nextStep} class="w-full text-white bg-primary-600 hover:bg-primary-700 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Continue</button>
                         </div>
                         {/if}
                         <p class="text-sm font-light text-gray-500 dark:text-gray-400">

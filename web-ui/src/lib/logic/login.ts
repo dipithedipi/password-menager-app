@@ -23,7 +23,7 @@ async function getSalt(email: string): (Promise<string|boolean>) {
     }
 }
 
-async function login(email: string, password: string, salt: string, otpCode: string): Promise<{ success: boolean; message: string }> {    
+async function login(email: string, password: string, salt: string, otpCode: string): Promise<{ success: boolean; message: string}> {    
     // hash password
     const hashedPassword = await hashPasswordArgon2id(password, salt);
     console.log('hashedPassword:', hashedPassword);
@@ -39,16 +39,10 @@ async function login(email: string, password: string, salt: string, otpCode: str
         });
 
         const message = await response.text();
+        const parsed = JSON.parse(message);
         if (!response.ok) {
-            return { success: false, message: JSON.parse(message).message };
+            return { success: false, message: parsed.message };
         }
-
-        // test AES
-        // const encrypted = encryptAES("Hello, World!", "password");
-        // console.log('encrypted:', encrypted);
-
-        // const decrypted = decryptAES(encrypted, "password");
-        // console.log('decrypted:', decrypted);
 
         return { success: true, message: message };
     } catch (error) {

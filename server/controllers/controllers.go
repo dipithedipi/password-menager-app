@@ -212,6 +212,88 @@ func Register(c *fiber.Ctx) error {
 	})
 }
 
+func VerifyUserRegister(c *fiber.Ctx) error {
+	var user models.UserVerify
+
+	if err := c.BodyParser(&user); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(user) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
+
+	if !utils.ValidateEmail(user.Email) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "invalid email",
+		})
+	}
+
+	// get user from db
+	retrivedUserDb, err := clientPostgresDb.User.FindMany(
+		db.User.Email.Equals(user.Email),
+	).Exec(context.Background())
+	if errors.Is(err, db.ErrNotFound) {
+		fmt.Printf("[-] Verify: No record with email: %s\n", user.Email)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "Email incorrect",
+		})
+	}
+
+	if err != nil {
+		fmt.Printf("[!] Verify: Error occurred finding email in database: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	// get otp secret from redis
+	otpSecret := clientRedisDb.Get(context.Background(), retrivedUserDb[0].ID).Val()
+	if otpSecret == "" {
+		fmt.Printf("[-] Verify: No otp secret found on redis\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "OTP error",
+		})
+	}
+
+	if !auth.VerifyOTP(otpSecret, user.Otp) {
+		fmt.Printf("[-] Verify: Invalid otp\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Invalid OTP",
+		})
+	}
+	
+	// event user verified
+	err = event.NewEvent(clientPostgresDb, "User verified", "User verified email", c.IP(), retrivedUserDb[0].ID)
+	if err != nil {
+		fmt.Printf("[!] Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	// update user in db
+	_, err = clientPostgresDb.User.FindMany(
+		db.User.ID.Equals(retrivedUserDb[0].ID),
+	).Update(
+		db.User.Verified.Set(true),
+	).Exec(context.Background())
+
+	if err != nil {
+		fmt.Printf("[!] Verify: Error occurred updating user: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	fmt.Printf("[+] Verify: User verified\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "User verified successfully",
+	})
+}
+
 func GetSaltFromUser(c *fiber.Ctx) error {
 	var user models.UserSaltLogin
 
@@ -377,7 +459,7 @@ func Login(c *fiber.Ctx) error {
 		Name:     os.Getenv("JWT_COOKIE_TOKEN_NAME"),
 		Value:    jwtToken,
 		Expires:  utils.CalculateExpireTime(os.Getenv("JWT_EXPIRES_IN")),
-		HTTPOnly: false, // this will be set from the frontend
+		HTTPOnly: false, 
 		Domain:  "127.0.0.1",
 		Path:    "/",
 		SameSite: "None",
@@ -436,6 +518,7 @@ func Login(c *fiber.Ctx) error {
 	fmt.Printf("[+] Updated last login: \n")
 	fmt.Printf("[+] Session: new session\n")
 	c.Cookie(&cookie)
+
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login successful",
 	})

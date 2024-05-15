@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -122,7 +123,7 @@ func SetupKAnonymity(clientPostgresDb *db.PrismaClient) {
         // check if the file is empty
         if len(lines) == 0 {
             fmt.Println("[!] Error: The starting wordlist file is empty")
-            panic(err)
+            panic(errors.New("the starting wordlist file is empty"))
         }
 
         // insert the data into the database
@@ -155,6 +156,7 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     apiUser.Post("/register", controllers.Register)
     apiUser.Get("/register/salt", controllers.RandomSalt)
     apiUser.Post("/register/username", controllers.CheckUsername)
+    apiUser.Post("/register/verify", controllers.VerifyUserRegister)
     apiUser.Post("/login", controllers.Login)
     apiUser.Post("/login/salt", controllers.GetSaltFromUser)
     apiUser.Post("/logout", controllers.Logout)

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { getSalt, login } from '$lib/logic/login';
-    import { checkMail } from '$lib/logic/utils';
+    import { checkMail, setCookie } from '$lib/logic/utils';
 
     let loginStep: number = 1;
     
@@ -102,6 +102,9 @@
         }
         
         console.log('Login success');
+        // setTimeout(() => {
+        //     window.location.href = "/passwords";
+        // }, 1000);
     }
 </script>
 

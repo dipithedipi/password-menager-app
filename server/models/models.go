@@ -12,6 +12,11 @@ type UserRegister struct {
     PublicKey       string `json:"publicKey"`
 }
 
+type UserVerify struct {
+    Email           string `json:"email"`
+    Otp             string `json:"otp"`
+}
+
 type UserRegisterUsernameCheck struct {
     Username        string `json:"username"`
 }

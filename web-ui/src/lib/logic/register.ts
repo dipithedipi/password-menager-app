@@ -96,4 +96,26 @@ async function register(email: string, username: string, password: string): Prom
     }
 }
 
-export { register, checkUsername };
+async function verifyAccount(email: string, otp: string): Promise<{ success: boolean; message: string }> {
+    try {
+        const response = await fetch('http://127.0.0.1:8000/user/register/verify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, otp }),
+        });
+
+        const message = await response.text();
+        if (!response.ok) {
+            return { success: false, message: JSON.parse(message).message };
+        }
+
+        return { success: true, message: message };
+    } catch (error) {
+        console.error('Error verifying account:', error);
+        return { success: false, message: 'Error verifying account' };
+    }
+}
+
+export { register, checkUsername, verifyAccount };
