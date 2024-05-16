@@ -459,7 +459,8 @@ func Login(c *fiber.Ctx) error {
 		Name:     os.Getenv("JWT_COOKIE_TOKEN_NAME"),
 		Value:    jwtToken,
 		Expires:  utils.CalculateExpireTime(os.Getenv("JWT_EXPIRES_IN")),
-		HTTPOnly: false, 
+		HTTPOnly: false,
+		Secure: false,
 		Domain:  "127.0.0.1",
 		Path:    "/",
 		SameSite: "None",
@@ -601,16 +602,27 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 			"message": "missing required fields",
 		})
 	}
-
-	// get password field without the password linked to user id in DB
-	result, err := clientPostgresDb.Password.FindMany(
-		db.Password.Website.Contains(passwordRequest.Domain),
-		db.Password.UserID.Equals(claims.Issuer),
-	).Omit(
-		db.Password.Password.Field(),
-		db.Password.UserID.Field(),
-	).Exec(context.Background())
-
+	
+	var result []db.PasswordModel
+	
+	// all passwords for the user
+	if passwordRequest.Domain == "*" {
+		result, err = clientPostgresDb.Password.FindMany(
+			db.Password.UserID.Equals(claims.Issuer),
+		).Omit(
+			db.Password.Password.Field(),
+			db.Password.UserID.Field(),
+		).Exec(context.Background())
+	} else {
+		// get password field without the password linked to user id in DB
+		result, err = clientPostgresDb.Password.FindMany(
+			db.Password.Website.Contains(passwordRequest.Domain),
+			db.Password.UserID.Equals(claims.Issuer),
+		).Omit(
+			db.Password.Password.Field(),
+			db.Password.UserID.Field(),
+		).Exec(context.Background())
+	}
 	if err != nil {
 		fmt.Printf("[!] Error occurred finding password: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -734,6 +746,20 @@ func GetPassword(c *fiber.Ctx) error {
 		}
 
 		fmt.Printf("[+] OTP: Access granted\n")
+	}
+
+	//update last password use
+	_, err = clientPostgresDb.Password.FindMany(
+		db.Password.ID.Equals(passwordRequest.PasswordId),
+		db.Password.UserID.Equals(claims.Issuer),
+	).Update(
+		db.Password.LastUsed.Set(time.Now()),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Error occurred updating last used password: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
 	}
 
 	// event password info

@@ -36,7 +36,8 @@ model Password {
   id         String    @id @unique @default(uuid()) // Unique identifier for the password, auto-incremented
   createdAt  DateTime  @default(now()) // Creation time, default is the current time
   updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
-  
+  lastUsed   DateTime? // Last used time
+
   website     String    // Domain name
   username    String    // Username
   description String?  @default("") // Description

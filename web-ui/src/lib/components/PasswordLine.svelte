@@ -1,21 +1,50 @@
 <script lang="ts">
+	import { calculateTimeDifference } from "$lib/logic/utils";
+
 	export let modalTarget: string;
+	export let username: string;
+	export let website: string;
+	export let lastuse: string;
+	export let onClick: () => void;
 </script>
 
 <tr
 	class="border-b hover:bg-gray-600 dark:border-gray-700"
 	data-modal-target={modalTarget}
 	data-modal-toggle={modalTarget}
+	on:click={onClick}
 >
 	<td class="h-10 w-10 px-4 py-4">
-		<img src="/logo.jpg" alt="" />
+		<img class="mx-auto" src="https://www.google.com/s2/favicons?domain={website}&sz=128" alt="" />
 	</td>
 	<th scope="row" class="whitespace-nowrap px-4 py-4 font-medium text-gray-900 dark:text-white">
-		test@mail.com
-		<div class="text-slate-400 sm:hidden">nvidia.com</div>
+		{#if username}
+			{username}
+		{:else}
+			Unknown
+		{/if}
+		<div class="text-slate-400 sm:hidden">
+			{#if website}
+				{website}
+			{:else}
+				Unknown
+			{/if}
+		</div>
 	</th>
-	<td class="hidden px-4 py-4 sm:flex">nvidia.com</td>
-	<td class="px-4 py-4">3 days ago</td>
+	<td class="hidden px-4 py-4 sm:mt-2 sm:block">
+		{#if website}
+			{website}
+		{:else}
+			Unknown
+		{/if}
+	</td>
+	<td class="px-4 py-4">
+		{#if lastuse}
+			{calculateTimeDifference(lastuse)}
+		{:else}
+			Unknown
+		{/if}
+	</td>
 	<td class="items-center justify-end px-4 py-4">
 		<button
 			id="apple-imac-27-dropdown-button"

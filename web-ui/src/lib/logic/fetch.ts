@@ -1,9 +1,13 @@
-async function waitfetchData(url: string, method:string, body:any): Promise<any> {
+
+// send the request with body and cookie
+async function waitfetchData(url: string, method:string, body:any): Promise<{data:any, success:any}> {
     try {
         const response = await fetch(url, {
             method: method,
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
+                'Access-Control-Allow-Credentials': 'true',
             },
             body: JSON.stringify(body),
         });
@@ -13,16 +17,10 @@ async function waitfetchData(url: string, method:string, body:any): Promise<any>
         }
 
         const data = await response.json();
-        return data;
+        return {data, success: true};
     } catch (error: any) {
         console.error('Error fetching data:', error);
-
-        // check if the error is because the token is expired and redirect to login
-        if (error.message.contains('Token')) {
-            alert(`${error.message}, Redirecting to login page.`);
-            window.location.href = '/login';
-        }
-        return false;
+        return {data:null, success: false};
     }
 }
 
