@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { Modal } from 'flowbite';
+
 	import MyModalNewPassword from './../../lib/components/MyModalNewPassword.svelte';
 	import MyModalPasswordInfo from '$lib/components/MyModalPasswordInfo.svelte';
 	import PasswordLine from '$lib/components/PasswordLine.svelte';
@@ -6,35 +8,60 @@
     import { waitfetchData } from '$lib/logic/fetch';
     import { onMount } from 'svelte';
 
-    let passwords:any = [];
+    let passwords:any = [
+    {
+        username: "test",
+        website: "www.google.com",
+        lastUsed: ""
+    },
+    {
+        username: "test",
+        website: "www.google.com",
+        lastUsed: ""
+    }    
+];
 
     let searchBarValue = '';
     async function search(e: any, searchValue: string = searchBarValue) {
-        if (searchValue === '') searchValue = '*';
+        console.log(searchBarValue)
+        if (searchValue === '') {
+            searchValue = '*';
+            passwords = 
+            [{
+                username: "test",
+                website: "www.google.com",
+                lastUsed: ""
+            },
+            {
+                username: "test",
+                website: "www.google.com",
+                lastUsed: ""
+            }]
+            return
+        }
         if (searchValue.trim() === '') return;
-        let {data, success} = await waitfetchData('http://127.0.0.1:8000/password/search', 'POST', {
-            domain: searchValue,
-        });
+        let success = false
+        // let {data, success} = await waitfetchData('http://127.0.0.1:8000/password/search', 'POST', {
+        //     domain: searchValue,
+        // });
         if (!success) {
-            console.error(data);
+            //console.error(data);
             passwords = [];
             return;
         }
-        passwords = data.passwords;
+        //passwords = data.passwords;
     }
 
     // TODO fix open modal when clicked a row in the table during search
 
-    function openModal() {
-        console.log('open modal');
-    }
+    // onMount(async () => {
+    //     search(null, "*");
+    // });
 
-    onMount(async () => {
-        search(null, "*");
-    });
+    let modal: Modal | null = null;
 </script>
 
-<MyModalPasswordInfo modalId="passwordInfo"></MyModalPasswordInfo>
+<MyModalPasswordInfo modalId="passwordInfo" on:modalDetect={(e) => modal = e.detail}></MyModalPasswordInfo>
 <MyModalNewPassword modalId="passwordAdd"></MyModalNewPassword>
 
 <section class="h-screen mt-4 bg-gray-50 dark:bg-gray-700 pt-6 rounded-md">
@@ -115,7 +142,7 @@
                     <tbody>
                         <!-- repeat the component n times based on the array length -->
                         {#each passwords as password}
-                            <PasswordLine modalTarget="passwordInfo" username={password.username} website={password.website} lastuse={password.lastUsed} onClick={openModal}></PasswordLine>
+                            <PasswordLine username={password.username} website={password.website} lastuse={password.lastUsed} on:click={() => modal?.show()}></PasswordLine>
                         {/each}
                     </tbody>
                 </table>

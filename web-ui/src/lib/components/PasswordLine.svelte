@@ -1,18 +1,14 @@
 <script lang="ts">
 	import { calculateTimeDifference } from "$lib/logic/utils";
 
-	export let modalTarget: string;
 	export let username: string;
 	export let website: string;
 	export let lastuse: string;
-	export let onClick: () => void;
 </script>
 
 <tr
 	class="border-b hover:bg-gray-600 dark:border-gray-700"
-	data-modal-target={modalTarget}
-	data-modal-toggle={modalTarget}
-	on:click={onClick}
+	on:click
 >
 	<td class="h-10 w-10 px-4 py-4">
 		<img class="mx-auto" src="https://www.google.com/s2/favicons?domain={website}&sz=128" alt="" />

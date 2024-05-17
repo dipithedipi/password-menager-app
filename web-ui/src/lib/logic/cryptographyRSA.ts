@@ -1,7 +1,7 @@
 function ab2str(buf: any) {
-    return String.fromCharCode.apply(null, new Uint8Array(buf));
+    return String.fromCharCode.apply(null, Array.from(new Uint8Array(buf)));
 }
-  
+
 /*
     Export the given key and write it into the "exported-key" space.
 */
