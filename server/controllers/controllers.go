@@ -69,7 +69,7 @@ func CheckUsername(c *fiber.Ctx) error {
 
 	if len(retrivedUserDb) > 0 {
 		fmt.Printf("[-] Register: Username already exists: %s\n", username.Username)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		return c.Status(fiber.ErrConflict.Code).JSON(fiber.Map{
 			"message": "Username already exists",
 			"available": false,
 		})
@@ -160,7 +160,6 @@ func Register(c *fiber.Ctx) error {
 		db.User.OtpSecret.Set(encryptedStoredOtpSecret),
 		db.User.PublicKey.Set(user.PublicKey),
 	).Exec(ctx)
-
 	if err != nil {
 		switch {
 		case strings.Contains(err.Error(), "failed on the fields: (`username`)"):
@@ -181,6 +180,24 @@ func Register(c *fiber.Ctx) error {
 			})
 		}
 	}
+
+	// generate 3 default categories
+	var categories []string = []string{"Work", "Personal", "Social"}
+	for _ ,category := range categories{
+		_, err = clientPostgresDb.Category.CreateOne(
+			db.Category.Name.Set(category),
+			db.Category.User.Link(
+				db.User.ID.Equals(createUser.ID),
+			),
+		).Exec(ctx)
+		if err != nil {
+			fmt.Printf("[!] ERROR: creating default categories %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "could not create user",
+			})
+		}
+	}
+	
 
 	result, err := json.MarshalIndent(createUser, "", " ")
 	if err != nil {
@@ -547,10 +564,32 @@ func PostNewPassword(c *fiber.Ctx) error {
 		})
 	}
 
+	// get category id
+	category, err := clientPostgresDb.Category.FindMany(
+		db.Category.Name.Equals(passwordFields.Category),
+		db.Category.UserID.Equals(claims.Issuer),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Error occurred finding category: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding category",
+		})
+	}
+	if len(category) == 0 {
+		fmt.Printf("[-] No category found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No category found",
+		})
+	}
+
 	// add password linked to user id in DB
 	_, err = clientPostgresDb.Password.CreateOne(
 		db.Password.Website.Set(passwordFields.Domain),
 		db.Password.Username.Set(passwordFields.Username),
+		db.Password.Categories.Link(
+			db.Category.ID.Equals(category[0].ID),
+		),
+
 		db.Password.Password.Set(passwordFields.Password),
 		db.Password.User.Link(
 			db.User.ID.Equals(claims.Issuer),
@@ -637,7 +676,7 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 		})
 	}
 
-	// Convertiamo []db.PasswordModel in []interface{}
+	// Convert []db.PasswordModel in []interface{}
 	var interfaceSlice []interface{}
 	for _, password := range result {
 		interfaceSlice = append(interfaceSlice, password)
@@ -874,6 +913,9 @@ func UpdatePassword(c *fiber.Ctx) error {
 		db.Password.Password.Set(passwordRequest.NewPassword),
 		db.Password.OtpProtected.Set(passwordRequest.OtpProtected),
 		db.Password.Description.Set(passwordRequest.NewDescription),
+		db.Password.Categories.Link(
+			db.Category.ID.Equals(passwordRequest.NewCategory),
+		),
 	).Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Update password: Error occurred updating password: %s", err)
@@ -1307,5 +1349,270 @@ func ForceLogoutSession(c *fiber.Ctx) error {
 	fmt.Printf("[+] Force remove session: Session removed successfully\n")
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Session Removed successfully",
+	})
+}
+
+func PostNewCategory(c *fiber.Ctx) error {
+	var categoryRequest models.CategoryCreate
+	if err := c.BodyParser(&categoryRequest); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(categoryRequest) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "missing required fields",
+		})
+	}
+
+	// get user id from jwt
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	// add category to db
+	_, err = clientPostgresDb.Category.CreateOne(
+		db.Category.Name.Set(categoryRequest.Name),
+		db.Category.User.Link(
+			db.User.ID.Equals(claims.Issuer),
+		),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Error occurred adding category: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error adding category",
+		})
+	}
+
+	// event category added
+	err = event.NewEvent(clientPostgresDb, "Category added", fmt.Sprintf("User added a new category: %s", categoryRequest.Name), c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	fmt.Printf("[+] Category added successfully\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Category added successfully",
+	})
+}
+
+func GetCategories(c *fiber.Ctx) error {
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	result, err := clientPostgresDb.Category.FindMany(
+		db.Category.UserID.Equals(claims.Issuer),
+	).Select(
+		db.Category.Name.Field(),
+		db.Category.ID.Field(),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Error occurred getting categories: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] No categories found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No categories found",
+		})
+	}
+
+	// Convert []db.PasswordModel in []interface{}
+	var interfaceSlice []interface{}
+	for _, category := range result {
+		interfaceSlice = append(interfaceSlice, category)
+	}
+
+	cleared, err := utils.ClearJsonFields(interfaceSlice, []string{"userId"})
+	if err != nil {
+		fmt.Printf("[!] Error occurred clearing json fields: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	fmt.Printf("[+] Categories found\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message":    "Categories found",
+		"categories": cleared,
+	})
+}
+
+func UpdateCategory(c *fiber.Ctx) error {
+	var categoryUpdate models.CategoryUpdate
+	if err := c.BodyParser(&categoryUpdate); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(categoryUpdate) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required fields",
+		})
+	}
+
+	// get user id from jwt
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Update category: Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	// get category from db
+	result, err := clientPostgresDb.Category.FindMany(
+		db.Category.Name.Equals(categoryUpdate.Name),
+		db.Category.UserID.Equals(claims.Issuer),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Update category: Error occurred finding category: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding category",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] Update category: No category found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No category found",
+		})
+	}
+
+	// update category
+	_, err = clientPostgresDb.Category.FindMany(
+		db.Category.ID.Equals(result[0].ID),
+		db.Category.UserID.Equals(claims.Issuer),
+	).Update(
+		db.Category.Name.Set(categoryUpdate.NewName),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Update category: Error occurred updating category: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error updating category",
+		})
+	}
+
+	// event category update
+	err = event.NewEvent(clientPostgresDb, "Category updated", fmt.Sprintf("User updated a category: %s", result[0].Name), c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Update category: Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	fmt.Printf("[+] Update category: Category updated successfully\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Category updated successfully",
+	})
+}
+
+func DeleteCategory(c *fiber.Ctx) error {
+	var categoryDelete models.CategoryDelete
+	if err := c.BodyParser(&categoryDelete); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if !utils.CheckAllFieldsHaveValue(categoryDelete) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Missing required fields",
+		})
+	}
+
+	// get user id from jwt
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Delete category: Error occurred parsing JWT token: %s", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
+		})
+	}
+
+	// check otp
+	otpSecret := clientRedisDb.Get(context.Background(), claims.Issuer).Val()
+	if otpSecret == "" {
+		fmt.Printf("[-] Delete category: OTP: No secret found\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "OTP error",
+		})
+	}
+
+	if !auth.VerifyOTP(otpSecret, categoryDelete.Otp) {
+		// event category delete failed otp
+		err = event.NewEvent(clientPostgresDb, "Category delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+		if err != nil {
+			fmt.Printf("[!] Delete category: Error occurred creating event: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Internal server error",
+			})
+		}
+	
+		fmt.Printf("[-] Delete category: OTP: Invalid code\n")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Invalid OTP",
+		})
+	}
+
+	// get category from db
+	result, err := clientPostgresDb.Category.FindMany(
+		db.Category.Name.Equals(categoryDelete.Name),
+		db.Category.UserID.Equals(claims.Issuer),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Delete category: Error occurred finding category: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding category",
+		})
+	}
+
+	if len(result) == 0 {
+		fmt.Printf("[-] Delete category: No category found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No category found",
+		})
+	}
+
+	// delete category
+	_, err = clientPostgresDb.Category.FindMany(
+		db.Category.ID.Equals(result[0].ID),
+		db.Category.UserID.Equals(claims.Issuer),
+	).Delete().Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Delete category: Error occurred deleting category: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error deleting category",
+		})
+	}
+
+	// event category delete
+	err = event.NewEvent(clientPostgresDb, "Category deleted", fmt.Sprintf("User deleted a category: %s", result[0].Name), c.IP(), claims.Issuer)
+	if err != nil {
+		fmt.Printf("[!] Delete category: Error occurred creating event: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	fmt.Printf("[+] Delete category: Category deleted successfully\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Category deleted successfully",
 	})
 }

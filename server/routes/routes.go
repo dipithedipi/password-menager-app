@@ -168,6 +168,12 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     apiPassword.Put("/update", controllers.UpdatePassword)
     apiPassword.Delete("/delete", controllers.DeletePassword)
 
+    apiCatgory := app.Group("/category", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb))
+    apiCatgory.Post("/new", controllers.PostNewCategory)
+    apiCatgory.Get("/gets", controllers.GetCategories)
+    apiCatgory.Put("/update", controllers.UpdateCategory)
+    apiCatgory.Delete("/delete", controllers.DeleteCategory)
+
     apiSession := app.Group("/session", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb))
     apiSession.Get("/gets", controllers.GetSessions)
     apiSession.Delete("/delete", controllers.ForceLogoutSession)
@@ -177,6 +183,4 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
 
     apiUtils := app.Group("/utils")
     apiUtils.Get("/checkPassword", controllers.CheckPasswordLeak)
-
-    // api.Get("/get-user", controllers.User)
 }

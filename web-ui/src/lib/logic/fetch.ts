@@ -9,7 +9,7 @@ async function waitfetchData(url: string, method:string, body:any): Promise<{dat
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Credentials': 'true',
             },
-            body: JSON.stringify(body),
+            body: method === "GET" ? null : JSON.stringify(body)
         });
 
         if (!response.ok) {

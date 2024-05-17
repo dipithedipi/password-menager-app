@@ -8,65 +8,70 @@
     import { waitfetchData } from '$lib/logic/fetch';
     import { onMount } from 'svelte';
 
-    let passwords:any = [
-    {
-        username: "test",
-        website: "www.google.com",
-        lastUsed: ""
-    },
-    {
-        username: "test",
-        website: "www.google.com",
-        lastUsed: ""
-    }    
-];
+    let passwordTitle = '';
+    let passwordDescription = '';
+    let passwordCategory = '';
+
+    let passwords:any = [];
 
     let searchBarValue = '';
     async function search(e: any, searchValue: string = searchBarValue) {
         console.log(searchBarValue)
-        if (searchValue === '') {
-            searchValue = '*';
-            passwords = 
-            [{
-                username: "test",
-                website: "www.google.com",
-                lastUsed: ""
-            },
-            {
-                username: "test",
-                website: "www.google.com",
-                lastUsed: ""
-            }]
-            return
-        }
+        if (searchValue === '') searchValue = '*';
         if (searchValue.trim() === '') return;
-        let success = false
-        // let {data, success} = await waitfetchData('http://127.0.0.1:8000/password/search', 'POST', {
-        //     domain: searchValue,
-        // });
+        let {data, success} = await waitfetchData('http://127.0.0.1:8000/password/search', 'POST', {
+            domain: searchValue,
+        });
         if (!success) {
-            //console.error(data);
+            console.error(data);
             passwords = [];
             return;
         }
-        //passwords = data.passwords;
+        passwords = data.passwords;
     }
 
-    // TODO fix open modal when clicked a row in the table during search
+    let categories:any[] = [];
+    async function getCategory() {
+        let {data, success} = await waitfetchData('http://127.0.0.1:8000/category/gets', 'GET', {});
+        if (!success) {
+            console.error(data);
+            return;
+        }
+        categories = data.categories;
+        console.log(data);
+    }
 
-    // onMount(async () => {
-    //     search(null, "*");
-    // });
+    function resolveCategories(category: string, categories: any[]) {
+        console.log("Categories data", categories)
+        if (!categories ||!Array.isArray(categories)) {
+            console.log("Categories data not available");
+            return;
+        }
+        let categoryObj = categories.find((cat: any) => cat.id === category);
+        return categoryObj?.name;
+    }
+
+    onMount(async () => {
+        getCategory();
+        search(null, "*");
+    });
+
+    function clickLineHandler(e: any, index: number, categories: any[]) {
+        passwordTitle = passwords[index].website;
+        passwordDescription = passwords[index].description;
+        passwordCategory = resolveCategories(passwords[index].category, categories);
+        modal?.show();
+    }
 
     let modal: Modal | null = null;
 </script>
 
-<MyModalPasswordInfo modalId="passwordInfo" on:modalDetect={(e) => modal = e.detail}></MyModalPasswordInfo>
+<MyModalPasswordInfo title={passwordTitle} description={passwordDescription} category={passwordCategory} modalId="passwordInfo" on:modalDetect={(e) => modal = e.detail}></MyModalPasswordInfo>
 <MyModalNewPassword modalId="passwordAdd"></MyModalNewPassword>
 
 <section class="h-screen mt-4 bg-gray-50 dark:bg-gray-700 pt-6 rounded-md">
     <div class="mx-auto max-w-screen-xl px-4 lg:px-12">
-        <div class="bg-white dark:bg-gray-800 relative shadow-md sm:rounded-lg overflow-hidden">
+        <div class="bg-white dark:bg-gray-800 relative shadow-md rounded-md sm:rounded-lg overflow-hidden">
             <div class="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0 md:space-x-4 p-4">
                 <div class="w-full md:w-1/2">
                     <div class="flex items-center">
@@ -99,28 +104,14 @@
                             </svg>
                         </button>
                         <div id="filterDropdown" class="z-10 hidden w-48 p-3 bg-white rounded-lg shadow dark:bg-gray-700">
-                            <h6 class="mb-3 text-sm font-medium text-gray-900 dark:text-white">Choose brand</h6>
+                            <h6 class="mb-3 text-sm font-medium text-gray-900 dark:text-white">Choose category</h6>
                             <ul class="space-y-2 text-sm" aria-labelledby="filterDropdownButton">
-                                <li class="flex items-center">
-                                    <input id="apple" type="checkbox" value="" class="w-4 h-4 bg-gray-100 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
-                                    <label for="apple" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-100">Apple (56)</label>
-                                </li>
-                                <li class="flex items-center">
-                                    <input id="fitbit" type="checkbox" value="" class="w-4 h-4 bg-gray-100 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
-                                    <label for="fitbit" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-100">Microsoft (16)</label>
-                                </li>
-                                <li class="flex items-center">
-                                    <input id="razor" type="checkbox" value="" class="w-4 h-4 bg-gray-100 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
-                                    <label for="razor" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-100">Razor (49)</label>
-                                </li>
-                                <li class="flex items-center">
-                                    <input id="nikon" type="checkbox" value="" class="w-4 h-4 bg-gray-100 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
-                                    <label for="nikon" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-100">Nikon (12)</label>
-                                </li>
-                                <li class="flex items-center">
-                                    <input id="benq" type="checkbox" value="" class="w-4 h-4 bg-gray-100 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
-                                    <label for="benq" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-100">BenQ (74)</label>
-                                </li>
+                                {#each categories as category}
+                                    <li class="flex items-center">
+                                        <input id="passwordCategory" type="checkbox" value="" class="w-4 h-4 bg-gray-100 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+                                        <label for="category" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-100">{category.name}</label>
+                                    </li>
+                                {/each}    
                             </ul>
                         </div>
                     </div>
@@ -141,8 +132,8 @@
                     </thead>
                     <tbody>
                         <!-- repeat the component n times based on the array length -->
-                        {#each passwords as password}
-                            <PasswordLine username={password.username} website={password.website} lastuse={password.lastUsed} on:click={() => modal?.show()}></PasswordLine>
+                        {#each passwords as password, index}
+                            <PasswordLine username={password.username} website={password.website} lastuse={password.lastUsed} on:click={ (event) => clickLineHandler(event, index, categories) }></PasswordLine>
                         {/each}
                     </tbody>
                 </table>

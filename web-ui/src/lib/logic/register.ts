@@ -22,7 +22,7 @@ async function getSalt(email: string): (Promise<string|boolean>) {
     }
 }
 
-async function checkUsername(username: string): (Promise<boolean>) {
+async function checkUsername(username: string): Promise<{success: boolean; message: string}> {
     try {
         const response = await fetch('http://127.0.0.1:8000/user/register/username', {
             method: 'POST',
@@ -32,15 +32,19 @@ async function checkUsername(username: string): (Promise<boolean>) {
             body: JSON.stringify({ username }),
         });
 
+        if (response.status === 409) {
+            return { success: false, message: 'Username already taken'};
+        }
+        
         if (!response.ok) {
             throw new Error(`HTTP error status: ${response.status}`);
         }
 
         const data = await response.json();
-        return data.available;
+        return { success: true, message: data.message}
     } catch (error) {
         console.error('Error checking username:', error);
-        return false;
+        return { success: false, message: 'Server error'};
     }
 }
 

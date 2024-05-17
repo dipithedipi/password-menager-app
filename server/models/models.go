@@ -36,6 +36,7 @@ type PasswordSet struct {
     Username        string `json:"username"`
     Description     string `json:"description"`
     Password        string `json:"password"`
+    Category        string `json:"category"`
     Otp             bool   `json:"otp"`
 }
 
@@ -59,6 +60,8 @@ type PasswordUpdate struct {
     OldPassword     string `json:"oldPassword"`
     NewPassword     string `json:"newPassword"`
     NewDescription  string `json:"description"`
+    Category        string `json:"category"`
+    NewCategory     string `json:"newCategory"`
     Otp             string `json:"otp"`
     OtpProtected    bool   `json:"otpProtected"`
 }
@@ -70,6 +73,20 @@ type PasswordLeakCheck struct {
 type EventRequest struct {
     StartDateTime   string `json:"start"`
     EndDateTime     string `json:"end"`
+}
+
+type CategoryCreate struct {
+    Name            string `json:"name"`
+}
+
+type CategoryUpdate struct {
+    Name      string `json:"name"`
+    NewName   string `json:"newName"`
+}
+
+type CategoryDelete struct {
+    Name      string `json:"name"`
+    Otp       string `json:"otp"`
 }
 
 type ArgonParams struct {

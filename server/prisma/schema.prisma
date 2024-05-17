@@ -30,6 +30,9 @@ model User {
   // -----------------------------------------------------------
   events          Event[]  // Relation to the Event model
   passwords       Password[] // Relation to the Password model
+
+  // -----------------------------------------------------------
+  categories      Category[] // Relation to the Category model
 }
 
 model Password {
@@ -41,6 +44,9 @@ model Password {
   website     String    // Domain name
   username    String    // Username
   description String?  @default("") // Description
+
+  category    String    // Foreign key to the Category model
+  categories  Category  @relation(fields: [category], references: [id]) // Relation to the Category model
 
   otpProtected Boolean   @default(false) // Two-factor authentication status, default is false
   password   String    // encrypted password
@@ -85,4 +91,18 @@ model PasswordLeak {
   id         String    @id @unique @default(uuid()) // Unique identifier for the leak, auto-incremented
   createdAt  DateTime  @default(now()) // Creation time, default is the current time
   passwordHash   String    // Password
+}
+
+// -----------------------------------------------------------
+model Category {
+  id         String    @id @unique @default(uuid()) // Unique identifier for the category, auto-incremented
+  createdAt  DateTime  @default(now()) // Creation time, default is the current time
+  updatedAt  DateTime  @updatedAt // Last update time, automatically set to the current time on update
+  name       String    // Category name
+  description String?  // Category description
+
+  userId     String    // Foreign key to the User model
+  user       User      @relation(fields: [userId], references: [id]) // Relation to the User model
+
+  passwords  Password[] // Relation to the Password model
 }
