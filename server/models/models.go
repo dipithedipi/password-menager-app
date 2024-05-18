@@ -42,6 +42,7 @@ type PasswordSet struct {
 
 type PasswordRequestSearch struct {
     Domain          string `json:"domain"`
+    Category        []string `json:"category"`
 }
 
 type PasswordRequestInfo struct {

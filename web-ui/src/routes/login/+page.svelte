@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { masterPassword } from '$lib/store/passwordStore';
 	import { goto } from '$app/navigation';
 	import { getSalt, login } from '$lib/logic/login';
     import { checkMail, setCookie } from '$lib/logic/utils';
@@ -102,6 +103,7 @@
         }
         
         console.log('Login success');
+        masterPassword.set(password);
         // setTimeout(() => {
         //     window.location.href = "/passwords";
         // }, 1000);

@@ -643,11 +643,53 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 	}
 	
 	var result []db.PasswordModel
+
+	// all passwords for the user filter by category, category is an array (a password can have only one category)
+	// convert category names to category ids
+	var categories []db.CategoryModel
+	if passwordRequest.Category[0] == "*" {
+		// get all category ids for the user
+		categories, err = clientPostgresDb.Category.FindMany(
+			db.Category.UserID.Equals(claims.Issuer),
+		).Exec(context.Background())
+		if err != nil {
+			fmt.Printf("[!] Error occurred finding categories: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Error finding categories",
+			})
+		}
+		
+	} else {
+		// get category ids for the user
+		categories, err = clientPostgresDb.Category.FindMany(
+			db.Category.Name.In(passwordRequest.Category),
+			db.Category.UserID.Equals(claims.Issuer),
+		).Exec(context.Background())
+		if err != nil {
+			fmt.Printf("[!] Error occurred finding categories: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Error finding categories",
+			})
+		}
+	}
+
+	if len(categories) == 0 {
+		fmt.Printf("[-] No categories found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No categories found",
+		})
+	}
 	
-	// all passwords for the user
+	// convert category ids to string array
+	var categoryIds []string
+	for _, category := range categories {
+		categoryIds = append(categoryIds, category.ID)
+	}
+
 	if passwordRequest.Domain == "*" {
 		result, err = clientPostgresDb.Password.FindMany(
 			db.Password.UserID.Equals(claims.Issuer),
+			db.Password.Category.In(categoryIds),
 		).Omit(
 			db.Password.Password.Field(),
 			db.Password.UserID.Field(),
@@ -657,6 +699,7 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 		result, err = clientPostgresDb.Password.FindMany(
 			db.Password.Website.Contains(passwordRequest.Domain),
 			db.Password.UserID.Equals(claims.Issuer),
+			db.Password.Category.In(categoryIds),
 		).Omit(
 			db.Password.Password.Field(),
 			db.Password.UserID.Field(),

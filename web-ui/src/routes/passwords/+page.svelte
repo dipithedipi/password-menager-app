@@ -1,26 +1,32 @@
 <script lang="ts">
     import { Modal } from 'flowbite';
 
+    import { masterPassword } from '$lib/store/passwordStore';
+    import { decryptAES } from '$lib/logic/cryptography';
 	import MyModalNewPassword from './../../lib/components/MyModalNewPassword.svelte';
 	import MyModalPasswordInfo from '$lib/components/MyModalPasswordInfo.svelte';
 	import PasswordLine from '$lib/components/PasswordLine.svelte';
 
+    import { getCategory } from '$lib/logic/fetch';
     import { waitfetchData } from '$lib/logic/fetch';
     import { onMount } from 'svelte';
 
     let passwordTitle = '';
+    let passwordUsername = '';
     let passwordDescription = '';
     let passwordCategory = '';
+    let passwordOtpProtected = false;
 
     let passwords:any = [];
 
     let searchBarValue = '';
-    async function search(e: any, searchValue: string = searchBarValue) {
+    async function search(e: any, searchValue: string = searchBarValue, categories: string[] = categoriesSelected) {
         console.log(searchBarValue)
         if (searchValue === '') searchValue = '*';
         if (searchValue.trim() === '') return;
         let {data, success} = await waitfetchData('http://127.0.0.1:8000/password/search', 'POST', {
             domain: searchValue,
+            category: categories
         });
         if (!success) {
             console.error(data);
@@ -31,14 +37,10 @@
     }
 
     let categories:any[] = [];
-    async function getCategory() {
-        let {data, success} = await waitfetchData('http://127.0.0.1:8000/category/gets', 'GET', {});
-        if (!success) {
-            console.error(data);
-            return;
-        }
-        categories = data.categories;
-        console.log(data);
+    async function getCategoryHandle() {
+        categories = await getCategory();
+        categoriesSelected = categories.map((cat: any) => cat.name);
+        console.log(categories);
     }
 
     function resolveCategories(category: string, categories: any[]) {
@@ -51,26 +53,62 @@
         return categoryObj?.name;
     }
 
+    let categoriesSelected: string[] = [];
+    function printSelectedCategories() {
+        console.log(categoriesSelected);
+    }
+
+    function handleClickFilterCategory(e: any) {
+        let category = e.target.value;
+
+        if (categoriesSelected.includes(category)) {
+            // one category is always selected
+            if (categoriesSelected.length === 1) {
+                alert("At least one category must be selected");
+                // recheck the checkbox
+                e.target.checked = true;
+                return;
+            }
+
+            // remove category if it is already selected
+            categoriesSelected = categoriesSelected.filter((cat) => cat !== category);
+        } else {
+            categoriesSelected.push(category);
+        }
+        // remove if a category is deselected 
+        if (categoriesSelected.length === 0) {
+            categoriesSelected = ["*"];
+        }
+
+        search(null, searchBarValue, categoriesSelected);
+    }
+
     onMount(async () => {
-        getCategory();
-        search(null, "*");
+        getCategoryHandle();
+        search(null, "*", ["*"]);
     });
 
     function clickLineHandler(e: any, index: number, categories: any[]) {
         passwordTitle = passwords[index].website;
-        passwordDescription = passwords[index].description;
+        passwordUsername = decryptAES(passwords[index].username, $masterPassword);
+        passwordDescription = decryptAES(passwords[index].description, $masterPassword);
         passwordCategory = resolveCategories(passwords[index].category, categories);
+        passwordOtpProtected = passwords[index].otpProtected;
         modal?.show();
     }
 
+    function refreshPasswords() {
+        console.log("Refreshing passwords");
+        search(null, searchBarValue, categoriesSelected);
+    }
     let modal: Modal | null = null;
 </script>
 
-<MyModalPasswordInfo title={passwordTitle} description={passwordDescription} category={passwordCategory} modalId="passwordInfo" on:modalDetect={(e) => modal = e.detail}></MyModalPasswordInfo>
-<MyModalNewPassword modalId="passwordAdd"></MyModalNewPassword>
+<MyModalPasswordInfo title={passwordTitle} username={passwordUsername} description={passwordDescription === '' ? "No informations": passwordDescription} category={passwordCategory} otpProtected={passwordOtpProtected} modalId="passwordInfo" on:modalDetect={(e) => modal = e.detail}></MyModalPasswordInfo>
+<MyModalNewPassword modalId="passwordAdd" on:updatePasswords={refreshPasswords}></MyModalNewPassword>
 
-<section class="h-screen mt-4 bg-gray-50 dark:bg-gray-700 pt-6 rounded-md">
-    <div class="mx-auto max-w-screen-xl px-4 lg:px-12">
+<section class="h-screen pb-2 mt-4 bg-gray-50 dark:bg-gray-700 pt-6 rounded-md">
+    <div class="h-full mx-auto max-w-screen-xl px-4 lg:px-12">
         <div class="bg-white dark:bg-gray-800 relative shadow-md rounded-md sm:rounded-lg overflow-hidden">
             <div class="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0 md:space-x-4 p-4">
                 <div class="w-full md:w-1/2">
@@ -94,7 +132,7 @@
                         Add password
                     </button>
                     <div class="flex items-center space-x-3 w-full md:w-auto">
-                        <button id="filterDropdownButton" data-dropdown-toggle="filterDropdown" class="w-full md:w-auto flex items-center justify-center py-2 px-4 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-primary-700 focus:z-10 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700" type="button">
+                        <button id="filterDropdownButton" on:click={printSelectedCategories} data-dropdown-toggle="filterDropdown" class="w-full md:w-auto flex items-center justify-center py-2 px-4 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-primary-700 focus:z-10 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700" type="button">
                             <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="h-4 w-4 mr-2 text-gray-400" viewbox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
                             </svg>
@@ -103,15 +141,15 @@
                                 <path clip-rule="evenodd" fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                             </svg>
                         </button>
-                        <div id="filterDropdown" class="z-10 hidden w-48 p-3 bg-white rounded-lg shadow dark:bg-gray-700">
+                        <div id="filterDropdown" class="z-10 border-2 border-gray-500 hidden w-48 p-3 bg-white rounded-lg shadow dark:bg-gray-700">
                             <h6 class="mb-3 text-sm font-medium text-gray-900 dark:text-white">Choose category</h6>
                             <ul class="space-y-2 text-sm" aria-labelledby="filterDropdownButton">
                                 {#each categories as category}
                                     <li class="flex items-center">
-                                        <input id="passwordCategory" type="checkbox" value="" class="w-4 h-4 bg-gray-100 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+                                        <input bind:value={category.name} on:click={handleClickFilterCategory} checked type="checkbox" class="w-4 h-4 bg-gray-100 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
                                         <label for="category" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-100">{category.name}</label>
                                     </li>
-                                {/each}    
+                                {/each}  
                             </ul>
                         </div>
                     </div>
@@ -133,8 +171,13 @@
                     <tbody>
                         <!-- repeat the component n times based on the array length -->
                         {#each passwords as password, index}
-                            <PasswordLine username={password.username} website={password.website} lastuse={password.lastUsed} on:click={ (event) => clickLineHandler(event, index, categories) }></PasswordLine>
+                            <PasswordLine username={decryptAES(password.username, $masterPassword)} website={password.website} lastuse={password.lastUsed} on:click={ (event) => clickLineHandler(event, index, categories) }></PasswordLine>
                         {/each}
+                        {#if passwords.length === 0}
+                            <tr>
+                                <td class="px-4 py-3 text-center" colspan="5">No password found</td>
+                            </tr>
+                        {/if}
                     </tbody>
                 </table>
             </div>

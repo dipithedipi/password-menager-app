@@ -39,6 +39,11 @@ func CheckAllFieldsHaveValue(s interface{}) bool {
 			if field.IsNil() {
 				return false
 			}
+		// array or strings
+		case reflect.Slice:
+			if field.Len() == 0 {
+				return false
+			}
 		default:
 			fmt.Printf("Tipo di campo non gestito: %s\n", field.Type())
 		}
