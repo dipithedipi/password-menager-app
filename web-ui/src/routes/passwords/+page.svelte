@@ -11,11 +11,14 @@
     import { waitfetchData } from '$lib/logic/fetch';
     import { onMount } from 'svelte';
 
+    let passwordId = '';
     let passwordTitle = '';
     let passwordUsername = '';
     let passwordDescription = '';
     let passwordCategory = '';
     let passwordOtpProtected = false;
+
+    let otpCodeInput = false;
 
     let passwords:any = [];
 
@@ -89,6 +92,8 @@
     });
 
     function clickLineHandler(e: any, index: number, categories: any[]) {
+        otpCodeInput = false;
+        passwordId = passwords[index].id;
         passwordTitle = passwords[index].website;
         passwordUsername = decryptAES(passwords[index].username, $masterPassword);
         passwordDescription = decryptAES(passwords[index].description, $masterPassword);
@@ -104,8 +109,22 @@
     let modal: Modal | null = null;
 </script>
 
-<MyModalPasswordInfo title={passwordTitle} username={passwordUsername} description={passwordDescription === '' ? "No informations": passwordDescription} category={passwordCategory} otpProtected={passwordOtpProtected} modalId="passwordInfo" on:modalDetect={(e) => modal = e.detail}></MyModalPasswordInfo>
-<MyModalNewPassword modalId="passwordAdd" on:updatePasswords={refreshPasswords}></MyModalNewPassword>
+<MyModalPasswordInfo
+    passwordId={passwordId}
+    title={passwordTitle} 
+    username={passwordUsername} 
+    description={passwordDescription === '' ? "No informations": passwordDescription} 
+    category={passwordCategory} 
+    otpProtected={passwordOtpProtected} 
+    modalId="passwordInfo" 
+    otpCodeInput={otpCodeInput}
+    on:modalDetect={(e) => modal = e.detail}
+    on:updatePasswords={refreshPasswords}
+    ></MyModalPasswordInfo>
+<MyModalNewPassword 
+    modalId="passwordAdd"
+    on:updatePasswords={refreshPasswords}
+></MyModalNewPassword>
 
 <section class="h-screen pb-2 mt-4 bg-gray-50 dark:bg-gray-700 pt-6 rounded-md">
     <div class="h-full mx-auto max-w-screen-xl px-4 lg:px-12">
