@@ -152,7 +152,7 @@
 							</svg>
 						</div>
 						<input
-              bind:value={website}
+              				bind:value={website}
 							type="text"
 							class="focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-500 dark:focus:border-primary-500 block h-11 w-full rounded-lg border border-gray-300 bg-gray-50 p-2 pl-10 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 							placeholder="www.example.com"
@@ -173,11 +173,11 @@
 								viewbox="0 0 24 24"
 								xmlns="http://www.w3.org/2000/svg"
 							>
-                <path d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3ZM20 7.23792L12.0718 14.338L4 7.21594V19H20V7.23792ZM4.51146 5L12.0619 11.662L19.501 5H4.51146Z"></path>
+                				<path d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3ZM20 7.23792L12.0718 14.338L4 7.21594V19H20V7.23792ZM4.51146 5L12.0619 11.662L19.501 5H4.51146Z"></path>
 							</svg>
 						</div>
 						<input
-              bind:value={username}
+              				bind:value={username}
 							type="text"
 							class="focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-500 dark:focus:border-primary-500 block h-11 w-full rounded-lg border border-gray-300 bg-gray-50 p-2 pl-10 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 							placeholder="example@example.com"
@@ -204,7 +204,7 @@
 							</svg>
 						</div>
 						<input
-              bind:value={details}
+              				bind:value={details}
 							type="text"
 							class="focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-500 dark:focus:border-primary-500 block h-11 w-full rounded-lg border border-gray-300 bg-gray-50 p-2 pl-10 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 							placeholder="Password info"
@@ -253,7 +253,7 @@
 				>
 					<div class="relative w-80">
 						<select
-              bind:value={category}
+              				bind:value={category}
 							id="countries"
 							class="block h-11 w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
 						>
@@ -262,9 +262,9 @@
 								<option value={category.name}>{category.name}</option>
 							{/each}
 						</select>
-            {#if errorCategory}
-              <p class="text-sm font-semibold mt-1 text-red-600 dark:text-red-500">Choose a category</p>
-            {/if}
+						{#if errorCategory}
+						<p class="text-sm font-semibold mt-1 text-red-600 dark:text-red-500">Choose a category</p>
+						{/if}
 					</div>
 					<div class="">
 						<label class="mb-5 inline-flex h-11 cursor-pointer items-center">

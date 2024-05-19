@@ -58,10 +58,9 @@ type PasswordDelete struct {
 
 type PasswordUpdate struct {
     PasswordId      string `json:"passwordId"`
-    OldPassword     string `json:"oldPassword"`
     NewPassword     string `json:"newPassword"`
-    NewDescription  string `json:"description"`
-    Category        string `json:"category"`
+    NewUsername     string `json:"NewUsername"`
+    NewDescription  string `json:"NewDescription"`
     NewCategory     string `json:"newCategory"`
     Otp             string `json:"otp"`
     OtpProtected    bool   `json:"otpProtected"`

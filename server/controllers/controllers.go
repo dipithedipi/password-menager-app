@@ -931,14 +931,6 @@ func UpdatePassword(c *fiber.Ctx) error {
 		fmt.Printf("[+] Update password: OTP: Access granted\n")
 	}
 
-	// check if the old password given is equal to the password in the db
-	if !cryptography.CompareStrings(passwordRequest.OldPassword, result[0].Password) {
-		fmt.Printf("[-] Update password: Password not match\n")
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "Password not match, old password is incorrect",
-		})
-	}
-
 	// event password update
 	err = event.NewEvent(clientPostgresDb, "Password updated", fmt.Sprintf("User updated a password for %s", result[0].Website), c.IP(), claims.Issuer)
 	if err != nil {
@@ -948,17 +940,34 @@ func UpdatePassword(c *fiber.Ctx) error {
 		})
 	}
 
+	// get new category id
+	category, err := clientPostgresDb.Category.FindMany(
+		db.Category.Name.Equals(passwordRequest.NewCategory),
+		db.Category.UserID.Equals(claims.Issuer),
+	).Exec(context.Background())
+	if err != nil {
+		fmt.Printf("[!] Update password: Error occurred finding category: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error finding category",
+		})
+	}
+	if len(category) == 0 {
+		fmt.Printf("[-] Update password: No category found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No category found",
+		})
+	}
+
 	// update password
 	_, err = clientPostgresDb.Password.FindMany(
 		db.Password.ID.Equals(passwordRequest.PasswordId),
 		db.Password.UserID.Equals(claims.Issuer),
 	).Update(
 		db.Password.Password.Set(passwordRequest.NewPassword),
+		db.Password.Username.Set(passwordRequest.NewUsername),
 		db.Password.OtpProtected.Set(passwordRequest.OtpProtected),
 		db.Password.Description.Set(passwordRequest.NewDescription),
-		db.Password.Categories.Link(
-			db.Category.ID.Equals(passwordRequest.NewCategory),
-		),
+		db.Password.Category.Set(category[0].ID),
 	).Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Update password: Error occurred updating password: %s", err)

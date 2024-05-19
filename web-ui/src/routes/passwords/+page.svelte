@@ -118,6 +118,7 @@
     otpProtected={passwordOtpProtected} 
     modalId="passwordInfo" 
     otpCodeInput={otpCodeInput}
+    categories={categories}
     on:modalDetect={(e) => modal = e.detail}
     on:updatePasswords={refreshPasswords}
     ></MyModalPasswordInfo>

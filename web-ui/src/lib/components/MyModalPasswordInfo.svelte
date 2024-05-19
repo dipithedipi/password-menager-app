@@ -1,23 +1,36 @@
 <script lang="ts">
 	import { otpCodeInputValue } from '$lib/store/otpStore';
-	import { waitfetchData } from '$lib/logic/fetch';
+	import { getCategory, waitfetchData } from '$lib/logic/fetch';
 	import { Modal } from 'flowbite';
-	import { createEventDispatcher } from 'svelte';
-  import OtpInput from './OtpInput.svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
+	import OtpInput from './OtpInput.svelte';
+	import { masterPassword } from '$lib/store/passwordStore';
+	import { decryptAES, encryptAES } from '$lib/logic/cryptography';
 
-  const dispatchUpdate = createEventDispatcher();
+	const dispatchUpdate = createEventDispatcher();
 
 	export let modalId: string;
-  export let passwordId: string;
+	export let passwordId: string;
 	export let username: string;
 	export let title: string;
 	export let description: string;
 	export let category: string;
 	export let otpProtected: boolean;
-  export let otpCodeInput: boolean;
+	export let otpCodeInput: boolean;
+	export let categories: any[];
 
-  let errorOtp: boolean = false;
-  let errorOtpText: string = "";
+	let editMode: boolean = false;
+  let copyPasswordMode: boolean = false;
+  let deleteMode: boolean = false;
+
+	let newUsername: string;
+	let newPassword: string;
+	let newDescription: string;
+	let newCategory: string;
+	let newOtpProtected: boolean;
+
+	let errorOtp: boolean = false;
+	let errorOtpText: string = '';
 
 	let modalElem: HTMLDivElement | null = null;
 	let modal: Modal | null = null;
@@ -25,49 +38,146 @@
 		modal = new Modal(modalElem);
 	}
 
-  $: if (username) {
-    otpCodeInput = false;
-  }
+	$: if (username) {
+		otpCodeInput = false;
+	}
 
 	const dispatch = createEventDispatcher<{ modalDetect: Modal }>();
 
 	$: if (modal !== null) {
-    otpCodeInput = false;
+		otpCodeInput = false;
 		dispatch('modalDetect', modal);
 	}
 
 	async function deletePassword() {
-    if (otpProtected && !otpCodeInput) {
+    copyPasswordMode = false;
+    editMode = false;
+    deleteMode = true;
+
+		if (otpProtected && !otpCodeInput) {
+			otpCodeInput = true;
+			console.log('Delete password otp protected');
+			return;
+		}
+
+		console.log('Delete password');
+		let { data, success } = await waitfetchData('http://127.0.0.1:8000/password/delete', 'DELETE', {
+			passwordId,
+			otp: $otpCodeInputValue == '' ? '000000' : $otpCodeInputValue
+		});
+		if (success) {
+			console.log('Password deleted');
+			dispatchUpdate('updatePasswords');
+      resetModal();
+			modal?.hide();
+		} else {
+			console.log('Error deleting password');
+			if (otpCodeInput) {
+				errorOtp = true;
+				errorOtpText = 'Invalid OTP code';
+			}
+		}
+	}
+
+	async function copyPassword() {
+    deleteMode = false;
+    editMode = false;
+    copyPasswordMode = true;
+
+		if (otpProtected && !otpCodeInput) {  
+      errorOtp = false;
+			otpCodeInput = true;
+			console.log('Copy password otp protected');
+			return;
+		}
+
+		console.log('Copy password');
+		let { data, success } = await waitfetchData('http://127.0.0.1:8000/password/get', 'POST', {
+			passwordId,
+			domain: title,
+			otp: $otpCodeInputValue == '' ? '000000' : $otpCodeInputValue
+		});
+		if (!success) {
+			console.log('Error getting password');
+			if (otpCodeInput) {
+				errorOtp = true;
+				errorOtpText = 'Invalid OTP code';
+			}
+			return;
+		}
+		navigator.clipboard.writeText(decryptAES(data.password[0].password, $masterPassword));
+		resetModal();
+    modal?.hide();
+    console.log('Password copied');
+	}
+
+	async function editPassword() {
+    copyPasswordMode = false;
+    deleteMode = false;
+
+    if (deleteMode || copyPasswordMode) {
+      otpCodeInput = false;
+    }
+
+    if (editMode && otpProtected && !otpCodeInput) {
+      errorOtp = false;
       otpCodeInput = true;
-      console.log('Delete password otp protected');
+      console.log('Edit password otp protected');
+      return;
+    } else {
+      if (!editMode) {
+        categories = await getCategory();
+        newUsername = username;
+        newDescription = description;
+        newCategory = category;
+        newOtpProtected = otpProtected;
+        newPassword = '';
+        editMode = true;
+        return;
+      }
+    }
+
+    if (editMode && !otpCodeInput && otpProtected) {
+      console.log("block otp")
+      return
+    }
+    
+    if (newUsername == '' || newDescription == '' || newCategory == '' || newPassword == '') {
+      alert('Please fill all the fields');
       return;
     }
 
-    console.log('Delete password');
-    let {data, success} = await waitfetchData("http://127.0.0.1:8000/password/delete", "DELETE", {
+		console.log('Edit password');
+    let { data, success } = await waitfetchData('http://127.0.0.1:8000/password/update', 'PUT', {
       passwordId,
-      otp: ($otpCodeInputValue == "") ? "000000" : $otpCodeInputValue
+      newUsername: encryptAES(newUsername, $masterPassword),
+      newDescription: encryptAES(newDescription, $masterPassword),
+      newCategory,
+      otpProtected: newOtpProtected,
+      newPassword: encryptAES(newPassword, $masterPassword),
+      otp: $otpCodeInputValue == '' ? '000000' : $otpCodeInputValue
     });
-    if (success) {
-      console.log('Password deleted');
-      dispatchUpdate('updatePasswords');
-      modal?.hide();
-    } else {
-      console.log('Error deleting password');
+    if (!success) {
+      console.log('Error editing password');
       if (otpCodeInput) {
         errorOtp = true;
-        errorOtpText = "Invalid OTP code";
+        errorOtpText = 'Invalid OTP code';
       }
+      return;
     }
+    console.log('Password edited');
+    dispatchUpdate('updatePasswords');
+    resetModal();
+    modal?.hide();
 	}
 
-	function copyPassword() {
-		console.log('Copy password');
-	}
-
-	function editPassword() {
-		console.log('Edit password');
-	}
+  function resetModal() {
+    copyPasswordMode = false;
+    otpCodeInput = false;
+    deleteMode = false;
+    editMode = false;
+    modal?.hide();
+  }
 </script>
 
 <div
@@ -84,15 +194,23 @@
 			<!-- Modal header -->
 			<div class="mb-4 flex justify-between rounded-t sm:mb-5">
 				<div class="text-lg text-gray-900 md:text-xl dark:text-white">
-					<h3 class="font-semibold">
-						{!otpCodeInput ? title : `Delete password: ${title}`}
+					<h3 class="font-semibold h-11 py-1">
+						{#if editMode}
+              Edit: {title}
+            {:else if copyPasswordMode}
+                Copy: {title}
+            {:else if deleteMode}
+              Delete: {title}
+            {:else}
+              {title}
+            {/if}
 					</h3>
 				</div>
 				<div>
 					<button
 						type="button"
 						class="inline-flex rounded-lg bg-transparent p-1.5 text-sm text-gray-400 hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-gray-600 dark:hover:text-white"
-						on:click={() => modal?.hide()}
+						on:click={resetModal}
 					>
 						<svg
 							aria-hidden="true"
@@ -111,19 +229,119 @@
 				</div>
 			</div>
 			{#if !otpCodeInput}
-				<dl>
+				<dl class={editMode ? "space-y-3":""}>
 					<dt class="mb-2 font-semibold leading-none text-gray-900 dark:text-white">
 						{username.includes('@') ? 'Email' : 'Username'}
 					</dt>
-					<dd class="mb-4 font-light text-gray-500 sm:mb-5 dark:text-gray-400">{username}</dd>
+					{#if !editMode}
+						<dd class="mb-4 font-light text-gray-500 sm:mb-5 dark:text-gray-400">{username}</dd>
+					{:else}
+						<div class="relative w-full">
+							<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+								<svg
+									aria-hidden="true"
+									class="h-5 w-5 scale-105 text-gray-500 dark:text-gray-400"
+									fill="currentColor"
+									viewbox="0 0 24 24"
+									xmlns="http://www.w3.org/2000/svg"
+								>
+									<path
+										d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3ZM20 7.23792L12.0718 14.338L4 7.21594V19H20V7.23792ZM4.51146 5L12.0619 11.662L19.501 5H4.51146Z"
+									></path>
+								</svg>
+							</div>
+							<input
+								bind:value={newUsername}
+								type="text"
+								class="focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-500 dark:focus:border-primary-500 block h-11 w-full rounded-lg border border-gray-300 bg-gray-50 p-2 pl-10 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+								placeholder="example@example.com"
+							/>
+						</div>
+					{/if}
 					<dt class="mb-2 font-semibold leading-none text-gray-900 dark:text-white">Details</dt>
-					<dd class="mb-4 font-light text-gray-500 sm:mb-5 dark:text-gray-400">{description}</dd>
+					{#if !editMode}
+						<dd class="mb-4 font-light text-gray-500 sm:mb-5 dark:text-gray-400">{description}</dd>
+					{:else}
+						<div class="relative w-full">
+							<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+								<svg
+									aria-hidden="true"
+									class="h-5 w-5 scale-105 text-gray-500 dark:text-gray-400"
+									fill="currentColor"
+									viewbox="0 0 24 24"
+									xmlns="http://www.w3.org/2000/svg"
+								>
+									<path
+										d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20ZM11 7H13V9H11V7ZM11 11H13V17H11V11Z"
+									></path>
+								</svg>
+							</div>
+							<input
+								bind:value={newDescription}
+								type="text"
+								class="focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-500 dark:focus:border-primary-500 block h-11 w-full rounded-lg border border-gray-300 bg-gray-50 p-2 pl-10 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+								placeholder="Password info"
+							/>
+						</div>
+					{/if}
+          {#if editMode}
+          <dt class="mb-2 font-semibold leading-none text-gray-900 dark:text-white">Password</dt>
+          <div class="relative w-full">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <svg
+                aria-hidden="true"
+                class="h-5 w-5 scale-105 text-gray-500 dark:text-gray-400"
+                fill="currentColor"
+                viewbox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M17 14H12.6586C11.8349 16.3304 9.61244 18 7 18C3.68629 18 1 15.3137 1 12C1 8.68629 3.68629 6 7 6C9.61244 6 11.8349 7.66962 12.6586 10H23V14H21V18H17V14ZM7 14C8.10457 14 9 13.1046 9 12C9 10.8954 8.10457 10 7 10C5.89543 10 5 10.8954 5 12C5 13.1046 5.89543 14 7 14Z"
+                ></path>
+              </svg>
+            </div>
+            <input
+              type="password"
+              bind:value={newPassword}
+              class="focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-500 dark:focus:border-primary-500 block h-11 w-full rounded-lg border border-gray-300 bg-gray-50 p-2 pl-10 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+              placeholder="•••••••••••"
+            />
+          </div>
+          {/if}
 					<dt class="mb-2 font-semibold leading-none text-gray-900 dark:text-white">Category</dt>
-					<dd class="mb-4 font-light text-gray-500 sm:mb-5 dark:text-gray-400">{category}</dd>
+					{#if !editMode}
+						<dd class="mb-4 font-light text-gray-500 sm:mb-5 dark:text-gray-400">{category}</dd>
+					{:else}
+						<div class="flex space-x-3 font-light text-gray-500 sm:space-x-5 dark:text-gray-400">
+							<div class="relative w-80">
+								<select
+									bind:value={newCategory}
+									id="categories"
+									class="block h-11 w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+								>
+									<option selected value="">Choose a category</option>
+									{#each categories as category}
+										<option value={category.name}>{category.name}</option>
+									{/each}
+								</select>
+							</div>
+							<div class="">
+								<label class="mb-5 inline-flex h-11 cursor-pointer items-center">
+									<input type="checkbox" bind:checked={newOtpProtected} class="peer sr-only" />
+									<div
+										class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rtl:peer-checked:after:-translate-x-full dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+									></div>
+									<span class="ms-3 text-sm font-bold text-gray-900 dark:text-gray-300"
+										>OTP secure</span
+									>
+								</label>
+							</div>
+						</div>
+					{/if}
 				</dl>
 			{:else}
 				<dl>
-					<OtpInput errorOtp={errorOtp} errorOtpText={errorOtpText}/>
+					<OtpInput {errorOtp} {errorOtpText} />
 				</dl>
 			{/if}
 			<div class="flex items-center justify-between">
@@ -147,7 +365,7 @@
 								clip-rule="evenodd"
 							></path></svg
 						>
-						Edit
+            {editMode ? 'Save' : 'Edit'}
 					</button>
 					<button
 						on:click={copyPassword}
@@ -185,7 +403,9 @@
 							clip-rule="evenodd"
 						></path></svg
 					>
-					<div>Delete</div>
+					<div>
+            {!deleteMode ? 'Delete' : 'Confirm'}
+          </div>
 				</button>
 			</div>
 		</div>
