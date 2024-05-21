@@ -43,4 +43,12 @@ function resolveCategories(category: string, categories: any[]) {
     return categoryObj?.name;
 }
 
-export { waitfetchData, getCategory, resolveCategories};
+async function getEvents(startFormatted: string, endFormatted: string) {
+    let {data, success} = await waitfetchData("http://127.0.0.1:8000/event/gets", "POST", {
+			start: startFormatted, 
+			end: endFormatted}
+		);
+		return {data, success};
+}
+
+export { waitfetchData, getCategory, resolveCategories, getEvents};

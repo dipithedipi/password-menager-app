@@ -1,5 +1,5 @@
 import QRCode from 'qrcode'
-import { parseISO } from 'date-fns';
+import { parseISO, format } from 'date-fns';
 
 function checkMail(mail: string): boolean {
   return /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/.test(mail);
@@ -54,4 +54,10 @@ async function generateQRCode(data: string): Promise<string> {
   return await QRCode.toDataURL(data);
 }
 
-export { checkMail, setCookie, generateQRCode, getCookie, calculateTimeDifference };
+function formatDate(date: string): string {
+  //dd/MM/yyyy -> yyyy-MM-dd
+  const dateArray = date.split("/");
+  return `${dateArray[2]}-${dateArray[1]}-${dateArray[0]}`;
+}
+
+export { checkMail, formatDate, setCookie, generateQRCode, getCookie, calculateTimeDifference };

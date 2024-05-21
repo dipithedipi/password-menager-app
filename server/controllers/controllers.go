@@ -29,6 +29,14 @@ var p = &models.ArgonParams{
 	KeyLength:   64,
 }
 
+const (
+	EventInfo     = "info"
+	EventDanger   = "danger"
+	EventSuccess  = "success"
+	EventWarning  = "warning"
+	EventDefault  = "default"
+)
+
 func SetPostgresDbClient(client *db.PrismaClient) {
 	clientPostgresDb = client
 }
@@ -213,7 +221,7 @@ func Register(c *fiber.Ctx) error {
 
 	// add new event do user db
 
-	err = event.NewEvent(clientPostgresDb, "User created", "", c.IP(), createUser.ID)
+	err = event.NewEvent(clientPostgresDb, EventSuccess, "User created", "", c.IP(), createUser.ID)
 	if err != nil {
 		fmt.Printf("[!] ERROR: creating event %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -283,7 +291,7 @@ func VerifyUserRegister(c *fiber.Ctx) error {
 	}
 	
 	// event user verified
-	err = event.NewEvent(clientPostgresDb, "User verified", "User verified email", c.IP(), retrivedUserDb[0].ID)
+	err = event.NewEvent(clientPostgresDb, EventSuccess, "User verified", "User verified email", c.IP(), retrivedUserDb[0].ID)
 	if err != nil {
 		fmt.Printf("[!] Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -424,7 +432,7 @@ func Login(c *fiber.Ctx) error {
 	if !equal {
 		fmt.Printf("[-] Login: Password wrong\n")
 		// Event login failed
-		err = event.NewEvent(clientPostgresDb, "Login failed", "User used a wrong password", c.IP(), retrivedUserDb[0].ID)
+		err = event.NewEvent(clientPostgresDb, EventWarning, "Login failed", "User used a wrong password", c.IP(), retrivedUserDb[0].ID)
 		if err != nil {
 			fmt.Printf("[!] Error occurred creating event: %s", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -449,7 +457,7 @@ func Login(c *fiber.Ctx) error {
 		fmt.Printf("[-] OTP: Invalid code\n")
 
 		// Event login failed
-		err = event.NewEvent(clientPostgresDb, "Login failed", "User use an OTP code invalid", c.IP(), retrivedUserDb[0].ID)
+		err = event.NewEvent(clientPostgresDb, EventWarning, "Login failed", "User use an OTP code invalid", c.IP(), retrivedUserDb[0].ID)
 		if err != nil {
 			fmt.Printf("[!] Error occurred creating event: %s", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -525,7 +533,7 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	// Event login success
-	err = event.NewEvent(clientPostgresDb, "Login success", "User logged in", c.IP(), retrivedUserDb[0].ID)
+	err = event.NewEvent(clientPostgresDb, EventInfo, "Login success", "User logged in", c.IP(), retrivedUserDb[0].ID)
 	if err != nil {
 		fmt.Printf("[!] Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -606,7 +614,7 @@ func PostNewPassword(c *fiber.Ctx) error {
 	}
 
 	// event password added
-	err = event.NewEvent(clientPostgresDb, "Password added", fmt.Sprintf("User added a new password for %s", passwordFields.Domain), c.IP(), claims.Issuer)
+	err = event.NewEvent(clientPostgresDb, EventInfo, "Password added", fmt.Sprintf("User added a new password for %s", passwordFields.Domain), c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -735,7 +743,14 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 	}
 
 	// event password preview
-	err = event.NewEvent(clientPostgresDb, "Password preview", fmt.Sprintf("User previewed a passwords for %s", passwordRequest.Domain), c.IP(), claims.Issuer)
+	var eventDescription string
+	if passwordRequest.Domain == "*" {
+		eventDescription = fmt.Sprintf("User search a passwords for %s", passwordRequest.Domain)
+	} else {
+		eventDescription = "User searched all passwords"
+	}
+
+	err = event.NewEvent(clientPostgresDb, EventInfo, "Password search", eventDescription, c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -804,7 +819,7 @@ func GetPassword(c *fiber.Ctx) error {
 		}
 		if !auth.VerifyOTP(otpSecret, passwordRequest.Otp) {
 			// event password info failed otp
-			err = event.NewEvent(clientPostgresDb, "Password info request failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+			err = event.NewEvent(clientPostgresDb, EventWarning, "Password info request failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
 			if err != nil {
 				fmt.Printf("[!] Error occurred creating event: %s", err)
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -819,7 +834,7 @@ func GetPassword(c *fiber.Ctx) error {
 		}
 
 		// event password info success otp
-		err = event.NewEvent(clientPostgresDb, "Password info request success", fmt.Sprintf("User viewed a password for %s protected by OTP", passwordRequest.Domain), c.IP(), claims.Issuer)
+		err = event.NewEvent(clientPostgresDb, EventSuccess, "Password info request success", fmt.Sprintf("User viewed a password for %s protected by OTP", passwordRequest.Domain), c.IP(), claims.Issuer)
 		if err != nil {
 			fmt.Printf("[!] Error occurred creating event: %s", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -845,7 +860,7 @@ func GetPassword(c *fiber.Ctx) error {
 	}
 
 	// event password info
-	err = event.NewEvent(clientPostgresDb, "Password info request success", fmt.Sprintf("User viewed a password for %s", passwordRequest.Domain), c.IP(), claims.Issuer)
+	err = event.NewEvent(clientPostgresDb, EventInfo, "Password info request success", fmt.Sprintf("User viewed a password for %s", passwordRequest.Domain), c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -914,7 +929,7 @@ func UpdatePassword(c *fiber.Ctx) error {
 		
 		if !auth.VerifyOTP(otpSecret, passwordRequest.Otp) {
 			// event password update failed otp
-			err = event.NewEvent(clientPostgresDb, "Password update failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+			err = event.NewEvent(clientPostgresDb, EventWarning, "Password update failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
 			if err != nil {
 				fmt.Printf("[!] Update password: Error occurred creating event: %s", err)
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -932,7 +947,7 @@ func UpdatePassword(c *fiber.Ctx) error {
 	}
 
 	// event password update
-	err = event.NewEvent(clientPostgresDb, "Password updated", fmt.Sprintf("User updated a password for %s", result[0].Website), c.IP(), claims.Issuer)
+	err = event.NewEvent(clientPostgresDb, EventSuccess, "Password updated", fmt.Sprintf("User updated a password for %s", result[0].Website), c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Update password: Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1036,7 +1051,7 @@ func DeletePassword(c *fiber.Ctx) error {
 		
 		if !auth.VerifyOTP(otpSecret, passwordRequest.Otp) {
 			// event password delete failed otp
-			err = event.NewEvent(clientPostgresDb, "Password delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+			err = event.NewEvent(clientPostgresDb, EventWarning, "Password delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
 			if err != nil {
 				fmt.Printf("[!] Delete password: Error occurred creating event: %s", err)
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1054,7 +1069,7 @@ func DeletePassword(c *fiber.Ctx) error {
 	}
 
 	// event password delete
-	err = event.NewEvent(clientPostgresDb, "Password deleted", fmt.Sprintf("User deleted a password for %s", result[0].Website), c.IP(), claims.Issuer)
+	err = event.NewEvent(clientPostgresDb, EventInfo, "Password deleted", fmt.Sprintf("User deleted a password for %s", result[0].Website), c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Delete password: Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1232,6 +1247,10 @@ func GetEvents(c *fiber.Ctx) error {
 		db.Event.UserID.Equals(claims.Issuer),
 		db.Event.CreatedAt.After(startDateTime),
 		db.Event.CreatedAt.Before(endDateTime),
+	).Omit(
+		db.Event.UserID.Field(),
+		db.Event.UpdatedAt.Field(),
+		db.Event.ID.Field(),
 	).Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Error occurred getting events: %s", err)
@@ -1247,10 +1266,26 @@ func GetEvents(c *fiber.Ctx) error {
 		})
 	}
 
+	// form db.Event to interface{}
+	var interfaceSlice []interface{}
+	for _, event := range result {
+		interfaceSlice = append(interfaceSlice, event)
+	}
+
+	// clear empty fields
+	fieldsToRemove := []string{"userId", "updatedAt", "id"}
+	clearedResult, err := utils.ClearJsonFields(interfaceSlice, fieldsToRemove)
+	if err != nil {
+		fmt.Printf("[!] Error occurred clearing json fields: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error elaborating events",
+		})
+	}
+
 	fmt.Printf("[+] Events found\n")
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Events found",
-		"events":  result,
+		"events":  clearedResult,
 	})
 }
 
@@ -1336,7 +1371,7 @@ func ForceLogoutSession(c *fiber.Ctx) error {
 
 	if !auth.VerifyOTP(otpSecret, sessionDeleteRequest.Otp) {
 		// event session delete failed otp
-		err = event.NewEvent(clientPostgresDb, "Session delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+		err = event.NewEvent(clientPostgresDb, EventWarning, "Session delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
 		if err != nil {
 			fmt.Printf("[!] Force remove session: Error occurred creating event: %s", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1351,7 +1386,7 @@ func ForceLogoutSession(c *fiber.Ctx) error {
 	}
 
 	// event session delete
-	err = event.NewEvent(clientPostgresDb, "Session deleted", "User deleted a session", c.IP(), claims.Issuer)
+	err = event.NewEvent(clientPostgresDb, EventSuccess,"Session deleted", "User deleted a session", c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Force remove session: Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1441,7 +1476,7 @@ func PostNewCategory(c *fiber.Ctx) error {
 	}
 
 	// event category added
-	err = event.NewEvent(clientPostgresDb, "Category added", fmt.Sprintf("User added a new category: %s", categoryRequest.Name), c.IP(), claims.Issuer)
+	err = event.NewEvent(clientPostgresDb, EventDefault, "Category added", fmt.Sprintf("User added a new category: %s", categoryRequest.Name), c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1562,7 +1597,7 @@ func UpdateCategory(c *fiber.Ctx) error {
 	}
 
 	// event category update
-	err = event.NewEvent(clientPostgresDb, "Category updated", fmt.Sprintf("User updated a category: %s", result[0].Name), c.IP(), claims.Issuer)
+	err = event.NewEvent(clientPostgresDb, EventInfo, "Category updated", fmt.Sprintf("User updated a category: %s", result[0].Name), c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Update category: Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1609,7 +1644,7 @@ func DeleteCategory(c *fiber.Ctx) error {
 
 	if !auth.VerifyOTP(otpSecret, categoryDelete.Otp) {
 		// event category delete failed otp
-		err = event.NewEvent(clientPostgresDb, "Category delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
+		err = event.NewEvent(clientPostgresDb, EventDefault, "Category delete failed", "User used an invalid OTP code", c.IP(), claims.Issuer)
 		if err != nil {
 			fmt.Printf("[!] Delete category: Error occurred creating event: %s", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1655,7 +1690,7 @@ func DeleteCategory(c *fiber.Ctx) error {
 	}
 
 	// event category delete
-	err = event.NewEvent(clientPostgresDb, "Category deleted", fmt.Sprintf("User deleted a category: %s", result[0].Name), c.IP(), claims.Issuer)
+	err = event.NewEvent(clientPostgresDb, EventInfo, "Category deleted", fmt.Sprintf("User deleted a category: %s", result[0].Name), c.IP(), claims.Issuer)
 	if err != nil {
 		fmt.Printf("[!] Delete category: Error occurred creating event: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

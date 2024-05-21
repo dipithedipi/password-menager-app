@@ -76,10 +76,13 @@ model Event {
   title      String    // Event title
   description String?  // Event description
   ipAddress  String    // Event IP address
+  type       String    // Event type, enum
 
   userId     String    // Foreign key to the User model
   user       User      @relation(fields: [userId], references: [id]) // Relation to the User model
 }
+
+
 
 enum TokenType {
   WEB // From web
