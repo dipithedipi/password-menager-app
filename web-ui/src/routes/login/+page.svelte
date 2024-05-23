@@ -104,9 +104,9 @@
         
         console.log('Login success');
         masterPassword.set(password);
-        // setTimeout(() => {
-        //     window.location.href = "/passwords";
-        // }, 1000);
+        setTimeout(() => {
+            window.location.href = "/passwords";
+        }, 400);
     }
 </script>
 

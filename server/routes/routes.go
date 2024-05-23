@@ -153,6 +153,7 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     controllers.SetRedisDbClient(clientRedisDb)
 
     apiUser := app.Group("/user")
+    apiUser.Get("/info", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb), controllers.UserInfo)
     apiUser.Post("/register", controllers.Register)
     apiUser.Get("/register/salt", controllers.RandomSalt)
     apiUser.Post("/register/username", controllers.CheckUsername)

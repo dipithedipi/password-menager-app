@@ -90,7 +90,6 @@ func CheckUsername(c *fiber.Ctx) error {
 	}
 }
 
-
 func Register(c *fiber.Ctx) error {
 	var user models.UserRegister
 
@@ -316,6 +315,66 @@ func VerifyUserRegister(c *fiber.Ctx) error {
 	fmt.Printf("[+] Verify: User verified\n")
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "User verified successfully",
+	})
+}
+
+func UserInfo(c *fiber.Ctx) error {
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "jwt error",
+		})
+	}
+
+	retrivedUserDb, err := clientPostgresDb.User.FindMany(
+		db.User.ID.Equals(claims.Issuer),
+	).Select(
+		db.User.Username.Field(),
+		db.User.Email.Field(),
+	).Exec(context.Background())
+	if errors.Is(err, db.ErrNotFound) {
+		fmt.Printf("[-] No record with id: %s\n", claims.Issuer)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "User not found",
+		})
+	} else if err != nil {
+		fmt.Printf("[!] Error occurred finding user in database: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	if len(retrivedUserDb) == 0 {
+		fmt.Printf("[-] No record with id: %s\n", claims.Issuer)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "User not found",
+		})
+	}
+
+	// db result to interface[]
+	var interfaceSlice []interface{}
+	for _, event := range retrivedUserDb {
+		interfaceSlice = append(interfaceSlice, event)
+	}
+
+	// remove sensitive data
+	fieldsToRemove := []string{
+		"masterPasswordHash", "salt", "otpSecret", "publicKey", "id", "createdAt", "updatedAt", "lastLogin",
+	}
+	clearedResult, err := utils.ClearJsonFields(interfaceSlice, fieldsToRemove)
+	if err != nil {
+		fmt.Printf("[!] Error occurred clearing json fields: %s", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
+	}
+
+	fmt.Printf("[+] User info found\n")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "User info found",
+		"user":    clearedResult,
 	})
 }
 
@@ -566,7 +625,7 @@ func PostNewPassword(c *fiber.Ctx) error {
 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
 	claims, err := auth.ParseJWTToken(cookie)
 	if err != nil {
-		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "jwt error",
 		})
@@ -644,7 +703,7 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
 	claims, err := auth.ParseJWTToken(cookie)
 	if err != nil {
-		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "jwt error",
 		})
@@ -781,7 +840,7 @@ func GetPassword(c *fiber.Ctx) error {
 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
 	claims, err := auth.ParseJWTToken(cookie)
 	if err != nil {
-		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Jwt error",
 		})
@@ -1119,7 +1178,7 @@ func Logout(c *fiber.Ctx) error {
 
 	claims, err := auth.ParseJWTToken(cookie)
 	if err != nil {
-		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Jwt error",
 		})
@@ -1146,6 +1205,7 @@ func Logout(c *fiber.Ctx) error {
 	// remove token from postgres db for sessions online
 	_, err = clientPostgresDb.Token.FindMany(
 		db.Token.TokenValue.Equals(cookie),
+		db.Token.UserID.Equals(claims.Issuer),
 	).Delete().Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Session: Error occurred removing token from db: %s", err)
@@ -1157,9 +1217,13 @@ func Logout(c *fiber.Ctx) error {
 	// clear the cookie
 	cookieClear := fiber.Cookie{
 		Name:     os.Getenv("JWT_COOKIE_TOKEN_NAME"),
-		Value:    "",
+		Value:    "hello :)",
 		Expires:  time.Now().Add(-time.Hour),
-		HTTPOnly: true,
+		HTTPOnly: false,
+		Secure: false,
+		Domain:  "127.0.0.1",
+		Path:    "/",
+		SameSite: "None",
 	}
 	c.Cookie(&cookieClear)
 
@@ -1223,7 +1287,7 @@ func GetEvents(c *fiber.Ctx) error {
 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
 	claims, err := auth.ParseJWTToken(cookie)
 	if err != nil {
-		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Jwt error",
 		})
@@ -1304,7 +1368,7 @@ func GetSessions(c *fiber.Ctx) error {
 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
 	claims, err := auth.ParseJWTToken(cookie)
 	if err != nil {
-		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Jwt error",
 		})
@@ -1469,7 +1533,7 @@ func PostNewCategory(c *fiber.Ctx) error {
 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
 	claims, err := auth.ParseJWTToken(cookie)
 	if err != nil {
-		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Jwt error",
 		})
@@ -1508,7 +1572,7 @@ func GetCategories(c *fiber.Ctx) error {
 	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
 	claims, err := auth.ParseJWTToken(cookie)
 	if err != nil {
-		fmt.Printf("[!] Error occurred parsing JWT token: %s", err)
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Jwt error",
 		})

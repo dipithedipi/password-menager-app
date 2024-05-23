@@ -1,5 +1,10 @@
 <script lang="ts">
 	import MyModalSettings from '$lib/components/MyModalSettings.svelte'
+	import { waitfetchData } from '$lib/logic/fetch';
+	import { onMount } from 'svelte';
+
+	let username = ""
+	let email = ""
 
 	function handleRedirectEvents(event:any) {
 		event.preventDefault()
@@ -15,6 +20,27 @@
 		event.preventDefault()
 		window.location.href = "/passwords"
 	}
+
+	async function logout() {
+		let {data, success} = await waitfetchData("http://127.0.0.1:8000/user/logout", "POST", {})
+		if (success) {
+			window.location.href = "/login"
+			console.log("Logged out")
+		} else {
+			alert("Error logging out")
+		}
+	}
+
+	onMount(async () => {
+		let {data, success} = await waitfetchData("http://127.0.0.1:8000/user/info", "GET", {})
+		console.log(data)
+		if (success) {
+			username = data.user[0].username
+			email = data.user[0].email
+		} else {
+			console.log("Error fetching user info")
+		}
+	})
 </script>
 
 <MyModalSettings modalId="settings"></MyModalSettings>
@@ -40,21 +66,23 @@
                   <div>
                     <button type="button" class="flex text-sm bg-gray-800 rounded-full focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600" aria-expanded="false" data-dropdown-toggle="dropdown-user">
                       <span class="sr-only">Open user menu</span>
-                      <img class="w-8 h-8 rounded-full" src="https://flowbite.com/docs/images/people/profile-picture-5.jpg" alt="user photo">
+                      <img class="w-8 h-8 rounded-full" src="https://www.kindpng.com/picc/m/722-7221920_placeholder-profile-image-placeholder-png-transparent-png.png" alt="user photo">
                     </button>
                   </div>
-                  <div class="z-50 hidden my-4 text-base list-none bg-white divide-y divide-gray-100 rounded shadow dark:bg-gray-700 dark:divide-gray-600" id="dropdown-user">
+                  <div class="z-50 border-2 border-gray-500 rounded-lg hidden my-4 text-base list-none bg-white divide-y divide-gray-100 shadow dark:bg-gray-700 dark:divide-gray-600" id="dropdown-user">
                     <div class="px-4 py-3" role="none">
                       <p class="text-sm text-gray-900 dark:text-white" role="none">
-                        Neil Sims
+                        {username}
                       </p>
                       <p class="text-sm font-medium text-gray-900 truncate dark:text-gray-300" role="none">
-                        neil.sims@flowbite.com
+                        {email}
                       </p>
                     </div>
                     <ul class="py-1" role="none">
                       <li>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-white" role="menuitem">Sign out</a>
+                        <button type="button" on:click={logout} class="rounded block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-red-500 font-bold" role="menuitem">
+							Sign out
+						</button>
                       </li>
                     </ul>
                   </div>
