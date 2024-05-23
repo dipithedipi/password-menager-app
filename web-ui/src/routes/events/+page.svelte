@@ -54,8 +54,8 @@
         }
 
 		return [
-			formatStartDate(today) + "T00:00:00.000Z",
-			formatStartDate(oneWeekAgo) + "T23:59:59.000Z"
+			formatStartDate(today) + "T23:59:59.000Z",
+			formatStartDate(oneWeekAgo) + "T00:00:00.000Z"
 		];
 	}
 

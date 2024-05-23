@@ -9,10 +9,13 @@ function setCookie(data: string) {
   document.cookie = data;
 }
 
+function betterTime(lastUse: string) {
+  return parseISO(lastUse).toLocaleString();
+}
+
 function calculateTimeDifference(lastUse: string): string {
   // Parse the lastUse string to a Date object
   const lastUseDate = parseISO(lastUse);
-
   // Get the current date and time
   const now = new Date();
 
@@ -60,4 +63,45 @@ function formatDate(date: string): string {
   return `${dateArray[2]}-${dateArray[1]}-${dateArray[0]}`;
 }
 
-export { checkMail, formatDate, setCookie, generateQRCode, getCookie, calculateTimeDifference };
+function formatUserAgent(userAgent: string): string {
+  // Inizia costruendo una stringa vuota per la descrizione
+  let description = "";
+
+  // Analizza l'User-Agent per identificare il sistema operativo
+  const osMatch = userAgent.toLowerCase().includes("windows");
+  if (osMatch) {
+      description += "Windows ";
+  } else if (userAgent.toLowerCase().includes("macintosh") || userAgent.toLowerCase().includes("mac os x")) {
+      description += "Mac OS X ";
+  } else if (userAgent.toLowerCase().includes("iphone") || userAgent.toLowerCase().includes("ipad") || userAgent.toLowerCase().includes("ipod")) {
+      description += "iOS ";
+  } else if (userAgent.toLowerCase().includes("android")) {
+      description += "Android ";
+  } else if (userAgent.toLowerCase().includes("linux")) {
+      description += "Linux ";
+  } else {
+      description += "Unknow OS ";
+  }
+
+  description += " (";
+
+  // Analizza l'User-Agent per identificare il browser
+  const browserMatch = userAgent.toLowerCase().includes("chrome");
+  if (browserMatch) {
+      description += "Chrome";
+  } else if (userAgent.toLowerCase().includes("firefox")) {
+      description += "Firefox";
+  } else if (userAgent.toLowerCase().includes("safari")) {
+      description += "Safari";
+  } else if (userAgent.toLowerCase().includes("opera")) {
+      description += "Opera";
+  } else if (userAgent.toLowerCase().includes("msie") || userAgent.toLowerCase().includes("trident")) {
+      description += "Internet Explorer";
+  } else {
+      description += "Unknown Browser";
+  }
+
+  return description + ")";
+}
+
+export { checkMail, formatDate, setCookie, generateQRCode, betterTime, getCookie, formatUserAgent, calculateTimeDifference };

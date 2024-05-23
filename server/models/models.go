@@ -102,6 +102,7 @@ type SessionModelResponse struct {
     IpAddress   string
     CreatedAt   string
     LastUse     string
+    UserAgent   string
     CurrentUser bool
 }
 

@@ -64,6 +64,7 @@ model Token {
   expireAt   DateTime  // Token expiration time
   type       TokenType @default(WEB)// Token type, enum value
   ipAddress  String // last login IP address
+  userAgent  String // last login user agent
 
   userId     String    // Foreign key to the User model
   user       User      @relation(fields: [userId], references: [id]) // Relation to the User model

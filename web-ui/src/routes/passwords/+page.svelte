@@ -106,6 +106,7 @@
         console.log("Refreshing passwords");
         search(null, searchBarValue, categoriesSelected);
     }
+    
     let modal: Modal | null = null;
 </script>
 

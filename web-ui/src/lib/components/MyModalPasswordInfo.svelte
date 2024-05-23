@@ -20,8 +20,8 @@
 	export let categories: any[];
 
 	let editMode: boolean = false;
-  let copyPasswordMode: boolean = false;
-  let deleteMode: boolean = false;
+  	let copyPasswordMode: boolean = false;
+  	let deleteMode: boolean = false;
 
 	let newUsername: string;
 	let newPassword: string;

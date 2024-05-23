@@ -516,11 +516,22 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
+	// get user user agent
+	userAgent := c.Get("User-Agent")
+	if strings.TrimSpace(userAgent) == "" {
+		fmt.Println("[!] Login: User agent not found")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "User agent not found",
+		})
+	}
+	userAgent = strings.TrimSpace(userAgent)
+
 	// add token to postgres db for sessions online
 	_, err = clientPostgresDb.Token.CreateOne(
 		db.Token.TokenValue.Set(jwtToken),
 		db.Token.ExpireAt.Set(utils.CalculateExpireTime(os.Getenv("JWT_EXPIRES_IN"))),
 		db.Token.IPAddress.Set(c.IP()),
+		db.Token.UserAgent.Set(userAgent),
 		db.Token.User.Link(
 			db.User.ID.Equals(retrivedUserDb[0].ID),
 		),
@@ -1301,6 +1312,7 @@ func GetSessions(c *fiber.Ctx) error {
 
 	result, err := clientPostgresDb.Token.FindMany(
 		db.Token.UserID.Equals(claims.Issuer),
+		db.Token.ExpireAt.After(time.Now()),
 	).Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Error occurred getting sessions: %s", err)
@@ -1324,6 +1336,7 @@ func GetSessions(c *fiber.Ctx) error {
 			LastUse:   	session.UpdatedAt.Format(time.RFC3339),
 			IpAddress:  session.IPAddress,
 			CreatedAt: 	session.CreatedAt.Format(time.RFC3339),
+			UserAgent:  session.UserAgent,
 			CurrentUser: false,
 		})
 		if session.TokenValue == cookie {
@@ -1394,10 +1407,10 @@ func ForceLogoutSession(c *fiber.Ctx) error {
 		})
 	}
 
-	// remove session from postgres db
-	// get
+	// find session from postgres db
 	result, err := clientPostgresDb.Token.FindMany(
 		db.Token.ID.Equals(sessionDeleteRequest.DatabaseElemID),
+		db.Token.UserID.Equals(claims.Issuer),
 	).Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Force remove session: Error occurred finding session: %s", err)
@@ -1416,6 +1429,7 @@ func ForceLogoutSession(c *fiber.Ctx) error {
 	// delete 
 	_, err = clientPostgresDb.Token.FindMany(
 		db.Token.ID.Equals(sessionDeleteRequest.DatabaseElemID),
+		db.Token.UserID.Equals(claims.Issuer),
 	).Delete().Exec(context.Background())
 	if err != nil {
 		fmt.Printf("[!] Force remove session: Error occurred deleting session: %s", err)
@@ -1424,10 +1438,10 @@ func ForceLogoutSession(c *fiber.Ctx) error {
 		})
 	}
 
-	// remove session from redis db
-	_, err = clientRedisDb.Del(context.Background(), result[0].TokenValue).Result()
+	// add the JWT token to redis blacklist
+	_, err = clientRedisDb.Set(context.Background(), result[0].TokenValue, claims.Issuer, time.Until(result[0].ExpireAt)).Result()
 	if err != nil {
-		fmt.Printf("[!] Force remove session: Error occurred deleting session from Redis: %s", err)
+		fmt.Printf("[!] Force remove session: Error occurred adding token to Redis blacklist: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Internal server error",
 		})
