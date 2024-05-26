@@ -128,8 +128,8 @@
     on:updatePasswords={refreshPasswords}
 ></MyModalNewPassword>
 
-<section class="h-screen pb-2 mt-4 bg-gray-50 dark:bg-gray-700 pt-6 rounded-md">
-    <div class="h-full mx-auto max-w-screen-xl px-4 lg:px-12">
+<div class="h-full sm:h-screen bg-gray-50 dark:bg-gray-700 pt-6 rounded-md">
+    <div class="mx-auto max-w-screen-xl px-4 lg:px-12">
         <div class="bg-white dark:bg-gray-800 relative shadow-md rounded-md sm:rounded-lg overflow-hidden">
             <div class="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0 md:space-x-4 p-4">
                 <div class="w-full md:w-1/2">
@@ -245,4 +245,4 @@
             </nav>
         </div>
     </div>
-</section>
+</div>

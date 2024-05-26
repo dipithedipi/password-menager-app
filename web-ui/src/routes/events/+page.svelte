@@ -73,7 +73,7 @@
 </script>
 
 <div class="{events.length < 8 ? "h-screen": "h-full"} pt-3 pb-3 bg-gray-700">
-	<div date-rangepicker datepicker-format="dd/mm/yyyy" class="flex items-center justify-center pt-6">
+	<div date-rangepicker datepicker-format="dd/mm/yyyy" class="ml-2 flex items-center justify-center pt-6">
 		<div class="ml-4 sm:ml-0 relative">
 			<div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
 				<svg

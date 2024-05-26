@@ -544,9 +544,9 @@ func Login(c *fiber.Ctx) error {
 		Value:    jwtToken,
 		Expires:  utils.CalculateExpireTime(os.Getenv("JWT_EXPIRES_IN")),
 		HTTPOnly: false,
-		Secure: false,
-		Domain:  "127.0.0.1",
-		Path:    "/",
+		Secure:   false,
+		Domain:   "127.0.0.1",
+		Path:     "/",
 		SameSite: "None",
 	}
 
@@ -667,8 +667,8 @@ func PostNewPassword(c *fiber.Ctx) error {
 		db.Password.Categories.Link(
 			db.Category.ID.Equals(category[0].ID),
 		),
-
 		db.Password.Password.Set(passwordFields.Password),
+		db.Password.Hash.Set(passwordFields.PartialHash),
 		db.Password.User.Link(
 			db.User.ID.Equals(claims.Issuer),
 		),
@@ -770,6 +770,7 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 			db.Password.Category.In(categoryIds),
 		).Omit(
 			db.Password.Password.Field(),
+			db.Password.Hash.Field(),
 			db.Password.UserID.Field(),
 		).Exec(context.Background())
 	} else {
@@ -780,6 +781,7 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 			db.Password.Category.In(categoryIds),
 		).Omit(
 			db.Password.Password.Field(),
+			db.Password.Hash.Field(),
 			db.Password.UserID.Field(),
 		).Exec(context.Background())
 	}
@@ -803,7 +805,7 @@ func GetPasswordPreview(c *fiber.Ctx) error {
 		interfaceSlice = append(interfaceSlice, password)
 	}
 
-	fieldsToRemove := []string{"userId", "password"}
+	fieldsToRemove := []string{"userId", "password" , "hash"}
 	clearedResult, err := utils.ClearJsonFields(interfaceSlice, fieldsToRemove)
 	if err != nil {
 		fmt.Printf("[!] Error occurred clearing json fields: %s", err)
@@ -1050,6 +1052,7 @@ func UpdatePassword(c *fiber.Ctx) error {
 	).Update(
 		db.Password.Password.Set(passwordRequest.NewPassword),
 		db.Password.Username.Set(passwordRequest.NewUsername),
+		db.Password.Hash.Set(passwordRequest.NewPartialHash),
 		db.Password.OtpProtected.Set(passwordRequest.OtpProtected),
 		db.Password.Description.Set(passwordRequest.NewDescription),
 		db.Password.Category.Set(category[0].ID),
@@ -1235,51 +1238,124 @@ func Logout(c *fiber.Ctx) error {
 }
 
 func CheckPasswordLeak(c *fiber.Ctx) error {
-	var passwordCheck models.PasswordLeakCheck
-
-	if err := c.BodyParser(&passwordCheck); err != nil {
-		return fiber.ErrBadRequest
-	}
-
-	if !utils.CheckAllFieldsHaveValue(passwordCheck) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "missing required fields",
+	cookie := c.Cookies(os.Getenv("JWT_COOKIE_TOKEN_NAME"))
+	claims, err := auth.ParseJWTToken(cookie)
+	if err != nil {
+		fmt.Printf("[!] Error occurred parsing JWT token: %s\n", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Jwt error",
 		})
 	}
 
-	// check if the password is in the password leaked database
-	result, err := clientPostgresDb.PasswordLeak.FindMany(
-		db.PasswordLeak.PasswordHash.Contains(passwordCheck.PasswordPartialHash),
+
+	// get password from db
+	result, err := clientPostgresDb.Password.FindMany(
+		db.Password.UserID.Equals(claims.Issuer),
+	).Select(
+		db.Password.Hash.Field(),
+		db.Password.Website.Field(),
+		db.Password.Username.Field(),
+		db.Password.Password.Field(),
+	).OrderBy(
+		db.Password.Hash.Order(db.ASC),
 	).Exec(context.Background())
 	if err != nil {
-		fmt.Printf("[!] Error occurred finding password in leaked database: %s", err)
+		fmt.Printf("[!] Error occurred finding password: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Internal server error",
+			"message": "Error finding password",
 		})
 	}
 
-	if len(result) > 0 {
-		possiblePasswordHash := []string{}
-		// check if the partial hash is the start of the password hash
-		for _, password := range result {
-			if strings.HasPrefix(password.PasswordHash, passwordCheck.PasswordPartialHash) {
-				possiblePasswordHash = append(possiblePasswordHash, password.PasswordHash)
-			}
+	if len(result) == 0 {
+		fmt.Printf("[-] No password found\n")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "No password found",
+		})
+	}
+
+	// from db.Password to array of obj{hash, website, username}
+	var passwordHashes []map[string]string
+	for _, password := range result {
+		passwordHashes = append(passwordHashes, map[string]string{
+			"hash":     password.Hash,
+			"website":  password.Website,
+			"username": password.Username,
+			"password": password.Password,
+		})
+	}
+
+	// filter unique hash
+	uniqueHashes := make(map[string]bool)
+	var uniquePasswordHashes []map[string]string
+	for _, password := range passwordHashes {
+		if !uniqueHashes[password["hash"]] {
+			uniqueHashes[password["hash"]] = true
+			uniquePasswordHashes = append(uniquePasswordHashes, password)
+		}
+	}
+
+	// check how many passwords are the same 
+	samePasswordcount := 0
+	// array same password divided by hash(subarrays of same passwords)
+	var samePasswordArray [][]map[string]string
+	for _, hash := range uniquePasswordHashes {
+		result, err := clientPostgresDb.Password.FindMany(
+			db.Password.Hash.Equals(hash["hash"]),
+		).Exec(context.Background())
+		if err != nil {
+			fmt.Printf("[!] Error occurred finding password: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Error finding password",
+			})
 		}
 
-		if len(possiblePasswordHash) > 0 {
-			fmt.Printf("[+] Password found in leaked database\n")
-			return c.Status(fiber.StatusOK).JSON(fiber.Map{
-				"message": "Possible password found in leaked database",
-				"result":  true,
-				"hashes": possiblePasswordHash,
+		if len(result) > 1 {
+			samePasswordcount += len(result)
+			samePasswordArray = append(samePasswordArray, []map[string]string{})
+			for _, password := range result {
+				samePasswordArray[len(samePasswordArray)-1] = append(samePasswordArray[len(samePasswordArray)-1], map[string]string{
+					"website":  password.Website,
+					"username": password.Username,
+					"Partialhash":     password.Hash,
+					"password": password.Password,
+				})
+			}
+		}
+	}
+	
+
+
+	// for each password user check if it is leaked
+	var possibleLeaks []map[string]string
+	for _, password := range passwordHashes {
+		result, err := clientPostgresDb.PasswordLeak.FindMany(
+			db.PasswordLeak.PasswordHash.StartsWith(password["hash"]),
+		).Exec(context.Background())
+		if err != nil {
+			fmt.Printf("[!] Error occurred finding password: %s", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Error finding password",
+			})
+		}
+		if len(result) > 0 {
+			possibleLeaks = append(possibleLeaks, map[string]string{
+				"website":  password["website"],
+				"username": password["username"],
+				"Partialhash":     password["hash"],
+				"password":	password["password"],
+				"LeakedHash": result[0].PasswordHash,
 			})
 		}
 	}
 
+	fmt.Printf("[+] Found %d possible leaks, %d possible same password\n", len(possibleLeaks), samePasswordcount)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Password safe",
-		"result": false,
+		"totalPassword": len(passwordHashes),
+		"samePasswordCount":  samePasswordcount,
+		"samePassword":  samePasswordArray,
+		"compromisedPasswordCount": len(possibleLeaks),
+		"compromisedPassword": possibleLeaks,
+		"message": "Check password leaks successful",
 	})
 }
 
@@ -1781,3 +1857,4 @@ func DeleteCategory(c *fiber.Ctx) error {
 		"message": "Category deleted successfully",
 	})
 }
+

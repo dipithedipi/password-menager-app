@@ -198,9 +198,9 @@ func DecodeHash(encodedHash string) (p *models.ArgonParams, salt, hash []byte, e
     return p, salt, hash, nil
 }
 
-// Sha1
-func Sha1(data string) string {
-    h := crypto.SHA1.New()
+// Sha256
+func Sha256(data string) string {
+    h := crypto.SHA256.New()
     h.Write([]byte(data))
     return fmt.Sprintf("%x", h.Sum(nil))
 }

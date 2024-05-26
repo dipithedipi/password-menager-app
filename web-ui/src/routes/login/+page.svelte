@@ -106,7 +106,7 @@
         masterPassword.set(password);
         setTimeout(() => {
             window.location.href = "/passwords";
-        }, 400);
+        }, 100);
     }
 </script>
 

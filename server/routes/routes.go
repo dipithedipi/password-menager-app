@@ -129,7 +129,7 @@ func SetupKAnonymity(clientPostgresDb *db.PrismaClient) {
         // insert the data into the database
         for _, line := range lines {
             _, err := clientPostgresDb.PasswordLeak.CreateOne(
-                db.PasswordLeak.PasswordHash.Set(cryptography.Sha1(line)),
+                db.PasswordLeak.PasswordHash.Set(cryptography.Sha256(line)),
             ).Exec(context.Background())
             if err != nil {
                 fmt.Println("[!] Error inserting the starting wordlist file into the database")
@@ -168,6 +168,7 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
     apiPassword.Post("/get", controllers.GetPassword)
     apiPassword.Put("/update", controllers.UpdatePassword)
     apiPassword.Delete("/delete", controllers.DeletePassword)
+    apiPassword.Get("/health", controllers.CheckPasswordLeak)
 
     apiCatgory := app.Group("/category", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb))
     apiCatgory.Post("/new", controllers.PostNewCategory)
@@ -181,7 +182,4 @@ func Setup(app *fiber.App, clientPostgresDb *db.PrismaClient, clientRedisDb *red
 
     apiEvent := app.Group("/event", auth.MiddlewareJWTAuth(clientRedisDb, clientPostgresDb))
     apiEvent.Post("/gets", controllers.GetEvents)
-
-    apiUtils := app.Group("/utils")
-    apiUtils.Get("/checkPassword", controllers.CheckPasswordLeak)
 }

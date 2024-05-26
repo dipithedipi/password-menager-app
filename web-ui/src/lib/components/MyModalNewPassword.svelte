@@ -1,28 +1,28 @@
 <script lang="ts">
 	import { getCategory } from '$lib/logic/fetch';
-  import { masterPassword } from '$lib/store/passwordStore';
-  import { encryptAES } from '$lib/logic/cryptography';
-  import { waitfetchData } from '$lib/logic/fetch';
+  	import { masterPassword } from '$lib/store/passwordStore';
+  	import { encryptAES, partialHashSHA256 } from '$lib/logic/cryptography';
+  	import { waitfetchData } from '$lib/logic/fetch';
 	import { onMount, createEventDispatcher } from 'svelte';
 
-  const dispatch = createEventDispatcher();
+ 	const dispatch = createEventDispatcher();
 
 	export let modalId: string;
 
 	let website: string = '';
 	let details: string = '';
-  let username: string = '';
+ 	let username: string = '';
 	let password: string = '';
 	let category: string = '';
-  let otp: boolean = false;
+  	let otp: boolean = false;
 
-  let errorUsername: boolean = false;
-  let errorPassword: boolean = false;
-  let errorWebsite: boolean = false;
-  let errorCategory: boolean = false;
+  	let errorUsername: boolean = false;
+  	let errorPassword: boolean = false;
+  	let errorWebsite: boolean = false;
+  	let errorCategory: boolean = false;
 	let showPasswordValue: boolean = false;
 	
-  let categories: any[] = [];
+  	let categories: any[] = [];
 
 	onMount(async () => {
 		categories = await getCategory();
@@ -57,6 +57,7 @@
     const encryptedPassword = encryptAES(password, $masterPassword);
     const encryptedDetails = encryptAES(details, $masterPassword);
     const encryptedUsername = encryptAES(username, $masterPassword);
+	const partialHash = partialHashSHA256(password);
 
     password = '';
     details = '';
@@ -66,6 +67,7 @@
       domain: website,
       username: encryptedUsername,
       description: encryptedDetails,
+	  hash: partialHash,
       password: encryptedPassword,
       category,
       otp

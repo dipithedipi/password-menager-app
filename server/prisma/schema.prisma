@@ -44,11 +44,13 @@ model Password {
   username    String    // Username
   description String?  @default("") // Description
 
+
   category    String    // Foreign key to the Category model
   categories  Category  @relation(fields: [category], references: [id]) // Relation to the Category model
 
   otpProtected Boolean   @default(false) // Two-factor authentication status, default is false
   password   String    // encrypted password
+  hash       String    // hash of the password for leak check (argon2id)
 
   userId     String    // Foreign key to the User model
   user       User      @relation(fields: [userId], references: [id]) // Relation to the User model

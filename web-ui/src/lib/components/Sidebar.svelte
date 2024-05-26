@@ -241,7 +241,7 @@
 	</aside>
 
 	<div class="sm:ml-64">
-		<div class="mt-10 rounded-lg border-2 border-gray-200 dark:border-gray-700">
+		<div class="mt-12 rounded-lg border-gray-700">
             <slot></slot>
         </div>
 	</div>

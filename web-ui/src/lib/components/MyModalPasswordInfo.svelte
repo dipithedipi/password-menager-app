@@ -2,10 +2,10 @@
 	import { otpCodeInputValue } from '$lib/store/otpStore';
 	import { getCategory, waitfetchData } from '$lib/logic/fetch';
 	import { Modal } from 'flowbite';
-	import { createEventDispatcher, onMount } from 'svelte';
+	import { createEventDispatcher } from 'svelte';
 	import OtpInput from './OtpInput.svelte';
 	import { masterPassword } from '$lib/store/passwordStore';
-	import { decryptAES, encryptAES } from '$lib/logic/cryptography';
+	import { decryptAES, encryptAES, partialHashSHA256 } from '$lib/logic/cryptography';
 
 	const dispatchUpdate = createEventDispatcher();
 
@@ -112,63 +112,64 @@
 	}
 
 	async function editPassword() {
-    copyPasswordMode = false;
-    deleteMode = false;
+		copyPasswordMode = false;
+		deleteMode = false;
 
-    if (deleteMode || copyPasswordMode) {
-      otpCodeInput = false;
-    }
+		if (deleteMode || copyPasswordMode) {
+		otpCodeInput = false;
+		}
 
-    if (editMode && otpProtected && !otpCodeInput) {
-      errorOtp = false;
-      otpCodeInput = true;
-      console.log('Edit password otp protected');
-      return;
-    } else {
-      if (!editMode) {
-        categories = await getCategory();
-        newUsername = username;
-        newDescription = description;
-        newCategory = category;
-        newOtpProtected = otpProtected;
-        newPassword = '';
-        editMode = true;
-        return;
-      }
-    }
+		if (editMode && otpProtected && !otpCodeInput) {
+		errorOtp = false;
+		otpCodeInput = true;
+		console.log('Edit password otp protected');
+		return;
+		} else {
+		if (!editMode) {
+			categories = await getCategory();
+			newUsername = username;
+			newDescription = description;
+			newCategory = category;
+			newOtpProtected = otpProtected;
+			newPassword = '';
+			editMode = true;
+			return;
+		}
+		}
 
-    if (editMode && !otpCodeInput && otpProtected) {
-      console.log("block otp")
-      return
-    }
-    
-    if (newUsername == '' || newDescription == '' || newCategory == '' || newPassword == '') {
-      alert('Please fill all the fields');
-      return;
-    }
+		if (editMode && !otpCodeInput && otpProtected) {
+		console.log("block otp")
+		return
+		}
+		
+		if (newUsername == '' || newDescription == '' || newCategory == '' || newPassword == '') {
+		alert('Please fill all the fields');
+		return;
+		}
 
-		console.log('Edit password');
-    let { data, success } = await waitfetchData('http://127.0.0.1:8000/password/update', 'PUT', {
-      passwordId,
-      newUsername: encryptAES(newUsername, $masterPassword),
-      newDescription: encryptAES(newDescription, $masterPassword),
-      newCategory,
-      otpProtected: newOtpProtected,
-      newPassword: encryptAES(newPassword, $masterPassword),
-      otp: $otpCodeInputValue == '' ? '000000' : $otpCodeInputValue
-    });
-    if (!success) {
-      console.log('Error editing password');
-      if (otpCodeInput) {
-        errorOtp = true;
-        errorOtpText = 'Invalid OTP code';
-      }
-      return;
-    }
-    console.log('Password edited');
-    dispatchUpdate('updatePasswords');
-    resetModal();
-    modal?.hide();
+			console.log('Edit password');
+		let { data, success } = await waitfetchData('http://127.0.0.1:8000/password/update', 'PUT', {
+			passwordId,
+			newUsername: encryptAES(newUsername, $masterPassword),
+			newDescription: encryptAES(newDescription, $masterPassword),
+			newCategory,
+			newHash: partialHashSHA256(newPassword),
+			otpProtected: newOtpProtected,
+			newPassword: encryptAES(newPassword, $masterPassword),
+			otp: $otpCodeInputValue == '' ? '000000' : $otpCodeInputValue
+		});
+		if (!success) {
+		console.log('Error editing password');
+		if (otpCodeInput) {
+			errorOtp = true;
+			errorOtpText = 'Invalid OTP code';
+		}
+		return;
+		}
+		console.log('Password edited');
+		dispatchUpdate('updatePasswords');
+		resetModal();
+		modal?.hide();
 	}
 
   function resetModal() {

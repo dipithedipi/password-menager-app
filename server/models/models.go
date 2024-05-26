@@ -35,6 +35,7 @@ type PasswordSet struct {
     Domain          string `json:"domain"`
     Username        string `json:"username"`
     Description     string `json:"description"`
+    PartialHash     string `json:"hash"`
     Password        string `json:"password"`
     Category        string `json:"category"`
     Otp             bool   `json:"otp"`
@@ -59,6 +60,7 @@ type PasswordDelete struct {
 type PasswordUpdate struct {
     PasswordId      string `json:"passwordId"`
     NewPassword     string `json:"newPassword"`
+    NewPartialHash  string `json:"newHash"`
     NewUsername     string `json:"NewUsername"`
     NewDescription  string `json:"NewDescription"`
     NewCategory     string `json:"newCategory"`

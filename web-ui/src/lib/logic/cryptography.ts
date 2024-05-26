@@ -35,6 +35,15 @@ async function hashPasswordArgon2id(password: string, salt: string): Promise<str
     return hash.hex;
 }
 
+// sha 256
+function hashSHA256(input: string): string {
+    return CryptoJS.SHA256(input).toString();
+}
+
+function partialHashSHA256(input: string): string {
+    return hashSHA256(input).substring(0, 30);
+}
+
 // AES
 function encryptAES(text: string, passphrase: string): string {
   return CryptoJS.AES.encrypt(text, passphrase).toString();
@@ -46,4 +55,4 @@ function decryptAES(ciphertext: string , passphrase: string): string {
   return originalText;
 }
 
-export { hashPasswordArgon2id, encryptAES, decryptAES, base64Encode, base64Decode, base64DecodeBytes};
+export { hashPasswordArgon2id, encryptAES, decryptAES, base64Encode, base64Decode, base64DecodeBytes, partialHashSHA256, hashSHA256};
