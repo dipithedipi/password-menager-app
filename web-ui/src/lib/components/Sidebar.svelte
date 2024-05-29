@@ -21,14 +21,20 @@
 		window.location.href = "/passwords"
 	}
 
+	function handleRedirectHealth(event:any) {
+		event.preventDefault()
+		window.location.href = "/health"
+	}
+
+	function handleRedirectGenerator(event:any) {
+		event.preventDefault()
+		window.location.href = "/generator"
+	}
+
 	async function logout() {
-		let {data, success} = await waitfetchData("http://127.0.0.1:8000/user/logout", "POST", {})
-		if (success) {
-			window.location.href = "/login"
-			console.log("Logged out")
-		} else {
-			alert("Error logging out")
-		}
+		await waitfetchData("http://127.0.0.1:8000/user/logout", "POST", {})
+		window.location.href = "/login"
+		console.log("Logged out")
 	}
 
 	onMount(async () => {
@@ -66,7 +72,7 @@
                   <div>
                     <button type="button" class="flex text-sm bg-gray-800 rounded-full focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600" aria-expanded="false" data-dropdown-toggle="dropdown-user">
                       <span class="sr-only">Open user menu</span>
-                      <img class="w-8 h-8 rounded-full" src="https://www.kindpng.com/picc/m/722-7221920_placeholder-profile-image-placeholder-png-transparent-png.png" alt="user photo">
+                      <img class="w-8 h-8 rounded-full" src="https://www.kindpng.com/picc/m/722-7221920_placeholder-profile-image-placeholder-png-transparent-png.png" alt="user">
                     </button>
                   </div>
                   <div class="z-50 border-2 border-gray-500 rounded-lg hidden my-4 text-base list-none bg-white divide-y divide-gray-100 shadow dark:bg-gray-700 dark:divide-gray-600" id="dropdown-user">
@@ -100,6 +106,7 @@
 		<div class="h-full overflow-y-auto bg-white px-3 pb-4 dark:bg-gray-800">
 			<ul class="space-y-2 font-medium">
 				<li>
+					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
 						href="#"
 						on:click={handleRedirectPasswords}
@@ -118,6 +125,7 @@
 					</a>
 				</li>
 				<li>
+					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
 						href="#"
 						on:click={handleRedirectDevices}
@@ -140,6 +148,7 @@
 					</a>
 				</li>
 				<li>
+					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
 						href="#"
 						on:click={handleRedirectEvents}
@@ -164,8 +173,10 @@
             </ul>
             <ul class="pt-4 mt-4 space-y-2 font-medium border-t border-gray-200 dark:border-gray-700">
 				<li>
+					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
-						href="/health"
+						href="#"
+						on:click={handleRedirectHealth}
 						class="group flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
 					>
 						<svg
@@ -181,8 +192,10 @@
 					</a>
 				</li>
                 <li>
+					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
-						href="/generator"
+						href="#"
+						on:click={handleRedirectGenerator}
 						class="group flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
 					>
 						<svg
@@ -205,7 +218,7 @@
                 <div id="dropdown-cta" class="p-4 mt-6 rounded-lg bg-blue-50 dark:bg-blue-900" role="alert">
                     <div class="flex items-center mb-3">
                        <span class="bg-orange-100 text-orange-800 text-sm font-semibold me-2 px-2.5 py-0.5 rounded dark:bg-orange-200 dark:text-orange-900">Beta</span>
-                       <button type="button" class="ms-auto -mx-1.5 -my-1.5 bg-blue-50 inline-flex justify-center items-center w-6 h-6 text-blue-900 rounded-lg focus:ring-2 focus:ring-blue-400 p-1 hover:bg-blue-200 h-6 w-6 dark:bg-blue-900 dark:text-blue-400 dark:hover:bg-blue-800" data-dismiss-target="#dropdown-cta" aria-label="Close">
+                       <button type="button" class="ms-auto -mx-1.5 -my-1.5 bg-blue-50 inline-flex justify-center items-center text-blue-900 rounded-lg focus:ring-2 focus:ring-blue-400 p-1 hover:bg-blue-200 h-6 w-6 dark:bg-blue-900 dark:text-blue-400 dark:hover:bg-blue-800" data-dismiss-target="#dropdown-cta" aria-label="Close">
                           <span class="sr-only">Close</span>
                           <svg class="w-2.5 h-2.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
                              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
@@ -218,6 +231,7 @@
                 </div>
                 <ul class="pt-4 mt-4 space-y-2 font-medium border-t border-gray-200 dark:border-gray-700">
                     <li>
+						<!-- svelte-ignore a11y-invalid-attribute -->
                         <a
                             href="#"
                             class="group flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"

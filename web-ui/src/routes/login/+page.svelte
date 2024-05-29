@@ -1,18 +1,13 @@
 <script lang="ts">
 	import { masterPassword } from '$lib/store/passwordStore';
-	import { goto } from '$app/navigation';
+    import { otpCodeInputValue } from '$lib/store/otpStore';
 	import { getSalt, login } from '$lib/logic/login';
-    import { checkMail, setCookie } from '$lib/logic/utils';
+    import { checkMail } from '$lib/logic/utils';
+	import OtpInput from '$lib/components/OtpInput.svelte';
 
     let loginStep: number = 1;
     
     // otp code
-    let code1: string = '';
-    let code2: string = '';
-    let code3: string = '';
-    let code4: string = '';
-    let code5: string = '';
-    let code6: string = '';
     let errorOtp: boolean = false;
     let errorOtpText: string = '';
 
@@ -75,13 +70,8 @@
         loginStep++;
     }
 
-    function getOtpCode() {
-        return code1 + code2 + code3 + code4 + code5 + code6;
-    }
-
     async function loginBtn() {
-        const otpCode = getOtpCode();
-        if (otpCode.length!= 6) {
+        if ($otpCodeInputValue.length!= 6) {
             errorOtp = true;
             errorOtpText = "OTP code not complete";
             return;
@@ -95,7 +85,7 @@
 
         errorOtp = false;
         // Await the login function to resolve its promise
-        let {success, message} = await login(email, password, salt.toString(), otpCode);
+        let {success, message} = await login(email, password, salt.toString(), $otpCodeInputValue);
         if (!success) {
             errorOtp = true;
             errorOtpText = message;
@@ -147,36 +137,9 @@
                     </div>
                 {:else if loginStep==2}
                     <div class="max-w-sm mx-auto" >
-                        <div class="flex mb-2 space-x-2 rtl:space-x-reverse mx-auto">
-                            <div>
-                                <label for="code-1" class="sr-only">First code</label>
-                                <input bind:value={code1} type="text" maxlength="1" data-focus-input-init data-focus-input-next="code-2" id="code-1" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                            </div>
-                            <div>
-                                <label for="code-2" class="sr-only">Second code</label>
-                                <input bind:value={code2} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-1" data-focus-input-next="code-3" id="code-2" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                            </div>
-                            <div>
-                                <label for="code-3" class="sr-only">Third code</label>
-                                <input bind:value={code3} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-2" data-focus-input-next="code-4" id="code-3" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                            </div>
-                            <div>
-                                <label for="code-4" class="sr-only">Fourth code</label>
-                                <input bind:value={code4} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-3" data-focus-input-next="code-5" id="code-4" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                            </div>
-                            <div>
-                                <label for="code-5" class="sr-only">Fifth code</label>
-                                <input bind:value={code5} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-4" data-focus-input-next="code-6" id="code-5" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                            </div>
-                            <div>
-                                <label for="code-6" class="sr-only">Sixth code</label>
-                                <input bind:value={code6} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-5" id="code-6" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                            </div>
-                        </div>
-                        <p id="helper-text-explanation" class="mt-2 mb-4 text-sm text-gray-500 dark:text-gray-400">Please introduce the 6 digit code from Autenticator App.</p>
-                        {#if errorOtp}
-                            <p class="text-sm mb-2 text-red-600 dark:text-red-500">{errorOtpText}</p>
-                        {/if}
+                        <div class="mb-2 mx-auto">
+                            <OtpInput errorOtp={errorOtp} errorOtpText={errorOtpText} />
+                        </div>                        
                         <button on:click={loginBtn} class="w-full text-white bg-primary-600 hover:bg-primary-700 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Sign in</button>
                     </div>
                 {/if}

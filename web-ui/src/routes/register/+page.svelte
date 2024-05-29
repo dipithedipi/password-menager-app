@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { otpCodeInputValue } from '$lib/store/otpStore';
 	import { checkMail, generateQRCode } from '$lib/logic/utils';
+    import OtpInput from '$lib/components/OtpInput.svelte';
     import { checkUsername, register, verifyAccount } from '$lib/logic/register';
 
     let username = '';
@@ -21,20 +23,14 @@
 
     let otpUrlQrCodeImage = ""
 
-    let code1: string = '';
-    let code2: string = '';
-    let code3: string = '';
-    let code4: string = '';
-    let code5: string = '';
-    let code6: string = '';
     let errorOtp: boolean = false;
     let errorOtpText: string = '';
 
-    function getOtpCode() {
-        return code1 + code2 + code3 + code4 + code5 + code6;
+    let registerStep = 0;
+    function prevStep () {
+        registerStep--;
     }
 
-    let registerStep = 0;
     async function nextStep() {
         errorEmail = false;
         errorPass = false;
@@ -82,7 +78,7 @@
             }
 
             // generate qrcode image
-            otpUrlQrCodeImage = await generateQRCode("otpauth://totp/Password%2520Manager:alpha@chad.com?issuer=Password%2BManager&secret=FCOLLDRRKP2CCEIQPBVGPI3C52TPHGZQJFYB5QBP3VGYQ7RKHWLQ");
+            otpUrlQrCodeImage = await generateQRCode(otp);
             console.log(otpUrlQrCodeImage);
 
             registerStep++;
@@ -90,9 +86,14 @@
             // otp qr code
             registerStep++;
         } else if (registerStep === 3) {
+            if ($otpCodeInputValue.length < 6) {
+                errorOtp = true;
+                errorOtpText = "OTP code not complete";
+                return;
+            }
+
             // otp code test
-            let otpCode = getOtpCode();
-            let {success, message} = await verifyAccount(email, otpCode);
+            let {success, message} = await verifyAccount(email, $otpCodeInputValue);
             if (!success) {
                 errorOtp = true;
                 errorOtpText = message;
@@ -139,15 +140,15 @@
                                     {/if}
                                 </div>
                                 <div class="py-4">
-                                    <label for="password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Password</label>
+                                    <label for="password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Set a password</label>
                                     <input bind:value={password} type="password" name="password" id="password" placeholder="••••••••" class="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
                                     {#if errorPass}
                                         <p class="text-sm mt-1 text-red-600 dark:text-red-500">Password must be at least 12 characters</p>
                                     {/if}
                                 </div>
                                 <div>
-                                    <label for="confirm-password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Confirm password</label>
-                                    <input bind:value={confirmPassword} type="confirm-password" name="confirm-password" id="confirm-password" placeholder="••••••••" class="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                    <label for="confirm-password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Confirm new password</label>
+                                    <input bind:value={confirmPassword} type="password" name="confirm-password" id="confirm-password" placeholder="••••••••" class="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
                                     {#if errorConfirmPass}
                                         <p class="text-sm mt-1 text-red-600 dark:text-red-500">Passwords doesn't mach</p>
                                     {/if}
@@ -177,36 +178,8 @@
                             </div>
                         {:else if registerStep === 3}
                         <div class="max-w-sm mx-auto">
-                            <div class="flex mb-2 space-x-2 rtl:space-x-reverse mx-auto">
-                                <div>
-                                    <label for="code-1" class="sr-only">First code</label>
-                                    <input bind:value={code1} type="text" maxlength="1" data-focus-input-init data-focus-input-next="code-2" id="code-1" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                                </div>
-                                <div>
-                                    <label for="code-2" class="sr-only">Second code</label>
-                                    <input bind:value={code2} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-1" data-focus-input-next="code-3" id="code-2" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                                </div>
-                                <div>
-                                    <label for="code-3" class="sr-only">Third code</label>
-                                    <input bind:value={code3} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-2" data-focus-input-next="code-4" id="code-3" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                                </div>
-                                <div>
-                                    <label for="code-4" class="sr-only">Fourth code</label>
-                                    <input bind:value={code4} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-3" data-focus-input-next="code-5" id="code-4" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                                </div>
-                                <div>
-                                    <label for="code-5" class="sr-only">Fifth code</label>
-                                    <input bind:value={code5} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-4" data-focus-input-next="code-6" id="code-5" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                                </div>
-                                <div>
-                                    <label for="code-6" class="sr-only">Sixth code</label>
-                                    <input bind:value={code6} type="text" maxlength="1" data-focus-input-init data-focus-input-prev="code-5" id="code-6" class="block w-10 h-10 md:w-14 md:h-14  py-3 text-sm font-extrabold text-center text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"  />
-                                </div>
-                            </div>
-                                <p id="helper-text-explanation" class="mt-2 mb-4 text-sm text-gray-500 dark:text-gray-400">Please introduce the 6 digit code from Autenticator App.</p>
-                            {#if errorOtp}
-                                <p class="text-sm mb-2 text-red-600 dark:text-red-500">{errorOtpText}</p>
-                            {/if}
+                            <OtpInput errorOtp={errorOtp} errorOtpText={errorOtpText} />
+                            <button on:click={prevStep} class="w-full mb-2 py-2 text-md font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-primary-700 focus:z-10 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700" type="button">Back</button>
                             <button on:click={nextStep} class="w-full text-white bg-primary-600 hover:bg-primary-700 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">Continue</button>
                         </div>
                         {/if}

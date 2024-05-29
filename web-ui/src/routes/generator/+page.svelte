@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { passwordStrength } from 'check-password-strength'
+
 	let randomPassword: string = '';
 	let passwordLength: number = 32;
 	let lowercase: boolean = true;
@@ -7,12 +9,25 @@
 	let specialCharacters: boolean = true;
 	let securityLevel: number = 1;
 	let securityLevelMap: any = {
+		0: ["bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300" ,'To Weak'],
 		1: ["bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300" ,'Weak'],
 		2: ["bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300" ,'Medium'],
 		3: ["bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" ,'Strong'],
 	};
 
+	let options: {
+		id: number;
+		value: string;
+		minDiversity: number;
+		minLength: number;
+	}[]
+
 	function generateRandomPassword() {
+		if (!lowercase && !uppercase && !numbers && !specialCharacters) {
+			alert('Please select at least one option');
+			return;
+		};
+
 		let characters = '';
 		if (lowercase) characters += 'abcdefghijklmnopqrstuvwxyz';
 		if (uppercase) characters += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -33,26 +48,7 @@
 	}
 
 	function calculateStrenght() {
-		// 4-10 = Weak, 11-20 = Medium, 21+ = Strong
-		// use regex to check if password contains lowercase, uppercase, numbers, special characters
-		let lowercaseRegex = new RegExp('(?=.*[a-z])');
-		let uppercaseRegex = new RegExp('(?=.*[A-Z])');
-		let numbersRegex = new RegExp('(?=.*[0-9])');
-		let specialCharactersRegex = new RegExp('(?=.*[!@#$%^&*()_+{}:"<>?|[];\',./`~])');
-
-		securityLevel = 1;
-
-		if (passwordLength >= 4 && passwordLength <= 10) {
-			securityLevel = 1;
-		} else if (passwordLength >= 11 && passwordLength <= 20) {
-			securityLevel = 2;
-		} else if (passwordLength >= 21) {
-			securityLevel = 3;
-		}
-
-		if (numbersRegex.test(randomPassword) && uppercaseRegex.test(randomPassword) && lowercaseRegex.test(randomPassword) && specialCharactersRegex.test(randomPassword) && passwordLength >= 21){
-			securityLevel = 3;
-		}
+		securityLevel = passwordStrength(randomPassword).id;
 	}
 </script>
 
@@ -116,7 +112,7 @@
 				class="ms-2 inline-flex items-center rounded-lg border border-blue-700 bg-blue-700 px-3 py-2.5 text-sm font-medium text-white hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
 			>
 				<svg
-					class="me-2 h-5 w-5"
+					class="sm:me-2 h-5 w-5"
 					aria-hidden="true"
 					xmlns="http://www.w3.org/2000/svg"
 					fill="currentColor"
@@ -124,7 +120,10 @@
 				>
 					<path d="M7 4V2H17V4H20.0066C20.5552 4 21 4.44495 21 4.9934V21.0066C21 21.5552 20.5551 22 20.0066 22H3.9934C3.44476 22 3 21.5551 3 21.0066V4.9934C3 4.44476 3.44495 4 3.9934 4H7ZM7 6H5V20H19V6H17V8H7V6ZM9 4V6H15V4H9Z"
 					></path>
-				</svg>Copy
+				</svg>
+				<div class="hidden sm:block">
+					Copy
+				</div>
 			</button>
 		</div>
 	</div>
@@ -195,68 +194,81 @@
 				</div>
 			</div>
 
-            <div class="mt-3 flex items-center rounded border border-gray-200 ps-4 dark:border-gray-700">
-                <input
-					checked={lowercase}
-					on:click={() => {lowercase = !lowercase}}
-					id="bordered-checkbox-lowercase"
-					type="checkbox"
-					name="bordered-checkbox"
-					class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
-				/>
-				<label
-					for="bordered-checkbox-lowercase"
-					class="ms-2 w-full py-4 text-sm font-medium text-gray-900 dark:text-gray-300"
-					>Lowercase</label
-				>
-			</div>
-			<div class="my-3 flex items-center rounded border border-gray-200 ps-4 dark:border-gray-700">
-				<input
-					checked={uppercase}
-					id="bordered-checkbox-uppercase"
-					on:click={() => {uppercase = !uppercase}}
-					type="checkbox"
-					value=""
-					name="bordered-checkbox"
-					class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
-				/>
-				<label
-					for="bordered-checkbox-uppercase"
-					class="ms-2 w-full py-4 text-sm font-medium text-gray-900 dark:text-gray-300"
-					>Uppercase</label
-				>
-			</div>
-			<div class="my-3 flex items-center rounded border border-gray-200 ps-4 dark:border-gray-700">
-				<input
-					checked={numbers}
-					on:click={() => {numbers = !numbers}}
-					id="bordered-checkbox-numbers"
-					type="checkbox"
-					name="bordered-checkbox"
-					class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
-				/>
-				<label
-					for="bordered-checkbox-numbers"
-					class="ms-2 w-full py-4 text-sm font-medium text-gray-900 dark:text-gray-300"
-					>Numbers</label
-				>
-			</div>
-			<div class="my-3 flex items-center rounded border border-gray-200 ps-4 dark:border-gray-700">
-				<input
-					checked={specialCharacters}
-					id="bordered-checkbox-special-characters"
-					type="checkbox"
-					on:click={() => {specialCharacters = !specialCharacters}}
-					name="bordered-checkbox"
-					class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
-				/>
-				<label
-					for="bordered-checkbox-special-characters"
-					class="ms-2 w-full py-4 text-sm font-medium text-gray-900 dark:text-gray-300"
-					>Special character</label
-				>
-			</div>
-            
+			
+	<button id="dropdownMenuIconButton" data-dropdown-toggle="dropdownDots" class="w-full border text-sm border-gray-600 justify-center inline-flex items-center mt-3 p-1 font-normal text-center text-gray-900 bg-white rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none dark:text-white focus:ring-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-600" type="button">
+		Options
+		<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mt-1 scale-110" viewBox="0 0 24 24" fill="currentColor">
+			<path d="M12 15.0006L7.75732 10.758L9.17154 9.34375L12 12.1722L14.8284 9.34375L16.2426 10.758L12 15.0006Z"></path>
+		</svg>
+	</button>
+	
+
+	
+	<!-- Dropdown menu -->
+	<div id="dropdownDots" class="border border-gray-600 z-10 hidden rounded-lg w-44 dark:bg-gray-800 dark:divide-gray-600">
+		<div class="mt-3 flex hover:bg-gray-700 items-center rounded-lg border border-gray-600 ps-4 mx-2">
+			<input
+				checked={lowercase}
+				on:click={() => {lowercase = !lowercase}}
+				id="bordered-checkbox-lowercase"
+				type="checkbox"
+				name="bordered-checkbox"
+				class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
+			/>
+			<label
+				for="bordered-checkbox-lowercase"
+				class="ms-2 w-full py-4 text-sm font-medium text-gray-900 dark:text-gray-300"
+				>Lowercase</label
+			>
+		</div>
+		<div class="mt-3 flex items-center hover:bg-gray-700 rounded-lg border border-gray-600 ps-4 mx-2">
+			<input
+				checked={uppercase}
+				id="bordered-checkbox-uppercase"
+				on:click={() => {uppercase = !uppercase}}
+				type="checkbox"
+				value=""
+				name="bordered-checkbox"
+				class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
+			/>
+			<label
+				for="bordered-checkbox-uppercase"
+				class="ms-2 w-full py-4 text-sm font-medium text-gray-900 dark:text-gray-300"
+				>Uppercase</label
+			>
+		</div>
+		<div class="mt-3 flex items-center hover:bg-gray-700 rounded-lg border border-gray-600 ps-4 mx-2">
+			<input
+				checked={numbers}
+				on:click={() => {numbers = !numbers}}
+				id="bordered-checkbox-numbers"
+				type="checkbox"
+				name="bordered-checkbox"
+				class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
+			/>
+			<label
+				for="bordered-checkbox-numbers"
+				class="ms-2 w-full py-4 text-sm font-medium text-gray-900 dark:text-gray-300"
+				>Numbers</label
+			>
+		</div>
+		<div class="mt-3 mb-2 flex items-center hover:bg-gray-700 rounded-lg border border-gray-600 ps-4 mx-2">
+			<input
+				checked={specialCharacters}
+				id="bordered-checkbox-special-characters"
+				type="checkbox"
+				on:click={() => {specialCharacters = !specialCharacters}}
+				name="bordered-checkbox"
+				class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-blue-600"
+			/>
+			<label
+				for="bordered-checkbox-special-characters"
+				class="ms-2 w-full py-4 text-sm font-medium text-gray-900 dark:text-gray-300"
+				>Special character</label
+			>
+		</div>
+		
+	</div> 
 		</div>
         <div class="flex pt-3 items-center rounded-lg border-gray-700 bg-gray-800 p-3 mt-2"> 
             <div class="ms-2 w-full text-sm font-medium text-gray-900 dark:text-gray-300">

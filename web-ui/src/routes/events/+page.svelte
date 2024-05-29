@@ -125,7 +125,7 @@
 				type="button" 
 				class="h-10 flex items-center justify-center text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-primary-600 dark:hover:bg-primary-700 focus:outline-none dark:focus:ring-primary-800"
 			>
-				<svg class="h-4 w-4 sm:mr-2" fill="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+			<svg class="h-4 w-4 sm:mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 					<path d="M18.031 16.6168L22.3137 20.8995L20.8995 22.3137L16.6168 18.031C15.0769 19.263 13.124 20 11 20C6.032 20 2 15.968 2 11C2 6.032 6.032 2 11 2C15.968 2 20 6.032 20 11C20 13.124 19.263 15.0769 18.031 16.6168ZM16.0247 15.8748C17.2475 14.6146 18 12.8956 18 11C18 7.1325 14.8675 4 11 4C7.1325 4 4 7.1325 4 11C4 14.8675 7.1325 18 11 18C12.8956 18 14.6146 17.2475 15.8748 16.0247L16.0247 15.8748Z"></path>
 				</svg>
 				<div class="hidden sm:block">
@@ -144,7 +144,7 @@
 				<p class="text-gray-400">No events found</p>
 			{:else}
 				{#each events as event, index}
-					<EventLine id={index.toString()} type={event.type} title={event.title} description={event.description} time={event.createAt} ip={event.ipAddress}/>
+					<EventLine id={index.toString()} type={event.type} title={event.title} description={event.description} time={event.createdAt} ip={event.ipAddress}/>
 				{/each}
 			{/if}
 		{/if}
